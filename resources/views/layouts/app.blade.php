@@ -8,7 +8,7 @@
         ['label' => 'Timeline', 'route' => 'timeline.index', 'permission' => 'view timeline', 'icon' => 'timeline'],
         ['label' => 'Reports', 'route' => 'reports.index', 'permission' => 'view reports', 'icon' => 'chart'],
         ['label' => 'Clients', 'route' => 'clients.index', 'permission' => 'view clients', 'icon' => 'building'],
-        ['label' => 'Software', 'route' => 'software.index', 'permission' => 'view software', 'icon' => 'cube'],
+        ['label' => 'Software', 'route' => 'softwares.index', 'permission' => 'view software', 'icon' => 'cube'],
         ['label' => 'Settings', 'route' => 'settings.index', 'permission' => 'view settings', 'icon' => 'cog'],
     ];
 @endphp
