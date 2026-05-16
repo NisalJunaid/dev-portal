@@ -1,0 +1,110 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+
+class Ticket extends Model
+{
+    use HasFactory;
+
+    public const STATUS_BACKLOG = 'backlog';
+    public const STATUS_BUG_PENDING = 'bug_pending';
+    public const STATUS_FEATURE_APPROVED = 'feature_approved';
+    public const STATUS_REJECTED = 'rejected';
+
+    public const TYPE_BUG = 'bug';
+    public const TYPE_FEATURE = 'feature';
+
+    public const URGENCIES = ['critical', 'high', 'medium', 'low'];
+    public const TYPES = [self::TYPE_BUG, self::TYPE_FEATURE];
+    public const STATUSES = [self::STATUS_BACKLOG, self::STATUS_BUG_PENDING, self::STATUS_FEATURE_APPROVED, self::STATUS_REJECTED];
+
+    protected $fillable = [
+        'client_id',
+        'software_id',
+        'submitted_by',
+        'assigned_to',
+        'ticket_no',
+        'title',
+        'description',
+        'urgency',
+        'type',
+        'status',
+        'rejection_reason',
+        'submitted_at',
+        'classified_at',
+        'completed_at',
+        'start_date',
+        'due_date',
+        'estimated_hours',
+        'actual_completed_at',
+        'priority_order',
+        'timeline_position',
+        'parent_ticket_id',
+        'depends_on_ticket_id',
+    ];
+
+    protected $casts = [
+        'submitted_at' => 'datetime',
+        'classified_at' => 'datetime',
+        'completed_at' => 'datetime',
+        'start_date' => 'date',
+        'due_date' => 'date',
+        'estimated_hours' => 'decimal:2',
+        'actual_completed_at' => 'datetime',
+    ];
+
+    public function client(): BelongsTo
+    {
+        return $this->belongsTo(Client::class);
+    }
+
+    public function software(): BelongsTo
+    {
+        return $this->belongsTo(Software::class);
+    }
+
+    public function submitter(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'submitted_by');
+    }
+
+    public function assignee(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'assigned_to');
+    }
+
+    public function parentTicket(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'parent_ticket_id');
+    }
+
+    public function dependency(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'depends_on_ticket_id');
+    }
+
+    public function comments(): HasMany
+    {
+        return $this->hasMany(TicketComment::class);
+    }
+
+    public function activities(): HasMany
+    {
+        return $this->hasMany(TicketActivity::class)->latest();
+    }
+
+    public function formattedStatus(): string
+    {
+        return str($this->status)->replace('_', ' ')->headline()->toString();
+    }
+
+    public function formattedUrgency(): string
+    {
+        return str($this->urgency)->headline()->toString();
+    }
+}

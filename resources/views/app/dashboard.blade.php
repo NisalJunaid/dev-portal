@@ -12,7 +12,7 @@
                     <p class="mt-1 text-sm font-semibold text-indigo-900">Accessible clients</p>
                 </div>
                 <div class="rounded-2xl bg-emerald-50 p-4">
-                    <p class="text-3xl font-black text-emerald-700">0</p>
+                    <p class="text-3xl font-black text-emerald-700">{{ $openTicketCount }}</p>
                     <p class="mt-1 text-sm font-semibold text-emerald-900">Open tickets</p>
                 </div>
                 <div class="rounded-2xl bg-amber-50 p-4">
