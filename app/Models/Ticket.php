@@ -16,6 +16,11 @@ class Ticket extends Model
     public const STATUS_BUG_BLOCKED = 'bug_blocked';
     public const STATUS_BUG_COMPLETED = 'bug_completed';
     public const STATUS_FEATURE_APPROVED = 'feature_approved';
+    public const STATUS_RECOMMENDED = 'recommended';
+    public const STATUS_NEXT_SPRINT = 'next_sprint';
+    public const STATUS_IN_PROGRESS = 'in_progress';
+    public const STATUS_FEATURE_BLOCKED = 'feature_blocked';
+    public const STATUS_FEATURE_COMPLETED = 'feature_completed';
     public const STATUS_REJECTED = 'rejected';
 
     public const TYPE_BUG = 'bug';
@@ -24,7 +29,20 @@ class Ticket extends Model
     public const URGENCIES = ['critical', 'high', 'medium', 'low'];
     public const TYPES = [self::TYPE_BUG, self::TYPE_FEATURE];
     public const BUG_STATUSES = [self::STATUS_BUG_PENDING, self::STATUS_BUG_BLOCKED, self::STATUS_BUG_COMPLETED];
-    public const STATUSES = [self::STATUS_BACKLOG, self::STATUS_BUG_PENDING, self::STATUS_BUG_BLOCKED, self::STATUS_BUG_COMPLETED, self::STATUS_FEATURE_APPROVED, self::STATUS_REJECTED];
+    public const FEATURE_STATUSES = [self::STATUS_FEATURE_APPROVED, self::STATUS_RECOMMENDED, self::STATUS_NEXT_SPRINT, self::STATUS_IN_PROGRESS, self::STATUS_FEATURE_BLOCKED, self::STATUS_FEATURE_COMPLETED];
+    public const STATUSES = [
+        self::STATUS_BACKLOG,
+        self::STATUS_BUG_PENDING,
+        self::STATUS_BUG_BLOCKED,
+        self::STATUS_BUG_COMPLETED,
+        self::STATUS_FEATURE_APPROVED,
+        self::STATUS_RECOMMENDED,
+        self::STATUS_NEXT_SPRINT,
+        self::STATUS_IN_PROGRESS,
+        self::STATUS_FEATURE_BLOCKED,
+        self::STATUS_FEATURE_COMPLETED,
+        self::STATUS_REJECTED,
+    ];
 
     protected $fillable = [
         'client_id',
@@ -119,5 +137,15 @@ class Ticket extends Model
     public function isCompletedBug(): bool
     {
         return $this->status === self::STATUS_BUG_COMPLETED;
+    }
+
+    public function isFeature(): bool
+    {
+        return $this->type === self::TYPE_FEATURE;
+    }
+
+    public function isCompletedFeature(): bool
+    {
+        return $this->status === self::STATUS_FEATURE_COMPLETED;
     }
 }
