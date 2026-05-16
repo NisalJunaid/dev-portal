@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\BugController;
 use App\Http\Controllers\ClientController;
 use App\Http\Controllers\App\DashboardController;
 use App\Http\Controllers\App\PageController;
@@ -25,7 +26,13 @@ Route::middleware('auth')->group(function () {
     Route::post('/tickets/{ticket}/comments', [TicketController::class, 'comment'])->name('tickets.comments.store');
     Route::resource('tickets', TicketController::class)->only(['index', 'create', 'store', 'show', 'update']);
 
-    foreach (['bugs', 'features', 'sprints', 'timeline', 'reports', 'settings'] as $section) {
+    Route::get('/bugs', [BugController::class, 'index'])->name('bugs.index');
+    Route::get('/bugs/{ticket}', [BugController::class, 'show'])->name('bugs.show');
+    Route::post('/bugs/{ticket}/pending', [BugController::class, 'pending'])->name('bugs.pending');
+    Route::post('/bugs/{ticket}/complete', [BugController::class, 'complete'])->name('bugs.complete');
+    Route::post('/bugs/{ticket}/block', [BugController::class, 'block'])->name('bugs.block');
+
+    foreach (['features', 'sprints', 'timeline', 'reports', 'settings'] as $section) {
         Route::get('/'.$section, PageController::class)
             ->defaults('section', $section)
             ->name($section.'.index');

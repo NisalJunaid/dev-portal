@@ -1,100 +1,77 @@
 # Implementation Tracker
 
-## Completed: Centralized ticket intake
+## Completed: Dedicated bug tracking workflow
 
 ### Summary
-Implemented a centralized ticket intake workflow on top of the authenticated Laravel Blade portal. Client users can submit tickets against enabled software in their own client workspace, while Kiel users can review a global backlog, classify intake as bug or feature work, reject requests with formal reasons, assign ownership, edit ticket metadata, comment internally or externally, and review an activity timeline.
+Implemented a dedicated bug fix workflow for tickets classified with `type = bug`. Bug fixes now have their own list and Kanban views, status transition endpoints, authorization checks, completion timestamp handling, and activity logging. The bug workflow is separate from centralized intake and future feature sprint workflows.
 
-### Database updates
-- `tickets` table added with client, software, submitter, nullable assignee, unique `ticket_no`, title, description, urgency enum, nullable type enum, status, rejection reason, submission/classification/completion timestamps, planning dates, estimates, priority/timeline ordering, parent/dependency ticket links, and timestamps.
-- `ticket_comments` table added with ticket, user, nullable parent comment, comment body, `is_internal` defaulting to `false`, and timestamps.
-- `ticket_activities` table added with ticket, nullable user, action, old/new values, description, and timestamps.
+### Bug statuses
+- `bug_pending`
+- `bug_blocked`
+- `bug_completed`
 
-### Models and relationships
-- `App\Models\Ticket`
-  - Constants for backlog, bug pending, feature approved, and rejected statuses.
-  - Constants for bug/feature types and critical/high/medium/low urgency values.
-  - Relationships to client, software, submitter, assignee, parent ticket, dependency ticket, comments, and activities.
-  - Date/timestamp and decimal casts for timeline and estimate fields.
-- `App\Models\TicketComment`
-  - Relationships to ticket, user, parent comment, and threaded replies.
-  - Boolean cast for `is_internal`.
-- `App\Models\TicketActivity`
-  - Relationships to ticket and nullable user.
-- Existing `Client`, `Software`, and `User` models now expose ticket/comment relationships.
-
-### Services
-- `TicketNumberService` generates unique ticket numbers using the required `KIEL-000001` format.
-- `TicketActivityService` centralizes activity log creation and serializes old/new values consistently.
+### Database and model updates
+- Extended `App\Models\Ticket` with bug blocked and bug completed status constants.
+- Added a `BUG_STATUSES` status list for bug-only queries and transition validation.
+- Added helper methods for checking whether a ticket is a bug and whether a bug is completed.
+- Bug completion sets both `completed_at` and `actual_completed_at`.
 
 ### Controllers and routes
-- Added `TicketController` for:
-  - Client/Kiel ticket listing.
-  - Client ticket submission.
-  - Ticket details.
-  - Kiel global backlog.
-  - Classification as bug or feature.
-  - Rejection with mandatory formal reason.
-  - Assignment to Kiel team members.
-  - Metadata updates for urgency, dates, assignee, status, estimate, and software.
-  - Threaded comments with optional Kiel-only internal visibility.
+- Added `BugController` for the dedicated bug workflow.
 - Authenticated routes added for:
-  - `GET /tickets`
-  - `GET /tickets/create`
-  - `POST /tickets`
-  - `GET /tickets/{ticket}`
-  - `PATCH /tickets/{ticket}`
-  - `GET /tickets/backlog`
-  - `PATCH /tickets/{ticket}/classify`
-  - `PATCH /tickets/{ticket}/reject`
-  - `PATCH /tickets/{ticket}/assign`
-  - `POST /tickets/{ticket}/comments`
+  - `GET /bugs`
+  - `GET /bugs/{ticket}`
+  - `POST /bugs/{ticket}/pending`
+  - `POST /bugs/{ticket}/complete`
+  - `POST /bugs/{ticket}/block`
+- Bug routes only expose tickets where `type = bug` and status is one of the bug workflow statuses.
+- Client users can view their own client bug tickets.
+- Bug status updates require the explicit `update bugs` permission.
+- Kiel roles receive bug update permission through the role seeder.
 
-### Intake and classification rules
-- Client software dropdowns only include enabled software scoped to the submitting client's workspace.
-- All newly submitted tickets land in `status = backlog` and `type = null`.
-- Bug classification sets `type = bug` and `status = bug_pending`.
-- Feature classification sets `type = feature` and `status = feature_approved`.
-- Rejection sets `status = rejected`, requires `rejection_reason`, and displays the formal reason on the ticket detail page for clients.
-
-### Comments and activity timeline
-- Comments support threaded replies through `parent_id`.
-- Kiel users can mark comments internal.
-- Client users cannot see internal comments or internal replies.
-- Activity timeline logs:
-  - Created.
-  - Classified.
-  - Rejected.
-  - Assigned.
-  - Urgency changed.
-  - Status changed.
-  - Dates changed.
-  - Comment added.
-  - Software changed as part of metadata edits.
+### Bug workflow rules
+- Pending, blocked, and completed are the only allowed bug board statuses.
+- Status transition requests validate:
+  - The user can view bug tickets.
+  - The ticket is a bug.
+  - The ticket is visible to the current user.
+  - The user has explicit bug update permission.
+  - The requested transition is in the allowed bug transition map.
+- Bug completion:
+  - Sets `status = bug_completed`.
+  - Sets `completed_at`.
+  - Sets `actual_completed_at`.
+  - Logs bug status activity.
+- Reopening or moving a completed bug back to pending/blocked clears completion timestamps.
 
 ### Views and UI
 - Added Blade views for:
-  - `resources/views/tickets/index.blade.php`
-  - `resources/views/tickets/create.blade.php`
-  - `resources/views/tickets/show.blade.php`
-  - `resources/views/tickets/backlog.blade.php`
-  - `resources/views/tickets/partials/comments.blade.php`
-  - `resources/views/tickets/partials/activity-timeline.blade.php`
-- Ticket detail uses a right-side Asana-style detail layout with:
-  - Status badge.
-  - Urgency badge.
-  - Metadata panel.
-  - Kiel action controls.
-  - Comments section.
-  - Visual activity timeline.
-- Dashboard open ticket count now reflects scoped ticket totals.
-- Sidebar route handling now points consistently at the implemented software and ticket routes.
+  - `resources/views/bugs/index.blade.php`
+  - `resources/views/bugs/show.blade.php`
+- Bug Fixes view is separate from the feature sprint workflow and centralized intake.
+- Bug list view includes ticket, client/software, status, urgency, assignment, and submission date.
+- Bug Kanban view includes columns:
+  - Pending
+  - Blocked
+  - Completed
+- Bug detail view includes description, comments, activity timeline, metadata, and authorized status controls.
+
+### Drag-and-drop behavior
+- Bug Kanban uses SortableJS for drag-and-drop.
+- Dragging a bug card between columns calls the matching secure Laravel endpoint.
+- Drag updates are performed without a full-page reload.
+- UI includes:
+  - Smooth drag animation.
+  - Saving indicator per target column.
+  - Error toast when update fails.
+  - Invalid/failed drops revert to the original column.
+- Client users without explicit update permission do not get drag-enabled cards.
 
 ### Verification performed
-- PHP syntax check passed for application, route, database, and seeder PHP files.
-- `composer install --no-interaction --no-progress` was attempted but could not install dependencies because `composer.lock` does not contain the configured Breeze and Spatie packages.
-- `php artisan route:list` was attempted but could not run because `vendor/autoload.php` is unavailable until Composer dependencies can be installed.
-- Full browser-based client submission, Kiel classification, rejection, comments, and activity log testing could not be executed in this environment because Laravel dependencies are unavailable.
+- PHP syntax checks passed for changed application, route, and seeder PHP files.
+- `npm run build` was attempted but could not complete because local Node dependencies are incomplete; Vite cannot resolve `tailwindcss` from `postcss.config.js`.
+- `php artisan route:list --path=bugs` was attempted but could not run because `vendor/autoload.php` is unavailable until Composer dependencies are installed.
+- Full browser-based bug lifecycle and drag/drop testing could not be executed in this environment because Composer dependencies are unavailable and the app cannot boot.
 
 ### Next planned task
-Implement bug tracking workflow and bug views.
+Implement feature request workflow and recommendation system.
