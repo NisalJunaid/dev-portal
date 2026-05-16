@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\BugController;
 use App\Http\Controllers\ClientController;
+use App\Http\Controllers\FeatureController;
 use App\Http\Controllers\App\DashboardController;
 use App\Http\Controllers\App\PageController;
 use App\Http\Controllers\SoftwareController;
@@ -32,7 +33,16 @@ Route::middleware('auth')->group(function () {
     Route::post('/bugs/{ticket}/complete', [BugController::class, 'complete'])->name('bugs.complete');
     Route::post('/bugs/{ticket}/block', [BugController::class, 'block'])->name('bugs.block');
 
-    foreach (['features', 'sprints', 'timeline', 'reports', 'settings'] as $section) {
+    Route::get('/features', [FeatureController::class, 'index'])->name('features.index');
+    Route::get('/features/recommended', [FeatureController::class, 'recommended'])->name('features.recommended');
+    Route::get('/features/{ticket}', [FeatureController::class, 'show'])->name('features.show');
+    Route::patch('/features/{ticket}', [FeatureController::class, 'update'])->name('features.update');
+    Route::post('/features/{ticket}/recommend', [FeatureController::class, 'recommend'])->name('features.recommend');
+    Route::post('/features/{ticket}/approve-next-sprint', [FeatureController::class, 'approveNextSprint'])->name('features.approve-next-sprint');
+    Route::post('/features/{ticket}/defer', [FeatureController::class, 'defer'])->name('features.defer');
+    Route::post('/features/{ticket}/complete', [FeatureController::class, 'complete'])->name('features.complete');
+
+    foreach (['sprints', 'timeline', 'reports', 'settings'] as $section) {
         Route::get('/'.$section, PageController::class)
             ->defaults('section', $section)
             ->name($section.'.index');
