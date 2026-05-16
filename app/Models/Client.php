@@ -10,14 +10,27 @@ class Client extends Model
 {
     use HasFactory;
 
+    public const STATUS_ACTIVE = 'active';
+    public const STATUS_INACTIVE = 'inactive';
+
     protected $fillable = [
         'name',
-        'slug',
+        'description',
         'status',
     ];
+
+    public function softwares(): HasMany
+    {
+        return $this->hasMany(Software::class);
+    }
 
     public function users(): HasMany
     {
         return $this->hasMany(User::class);
+    }
+
+    public function isActive(): bool
+    {
+        return $this->status === self::STATUS_ACTIVE;
     }
 }
