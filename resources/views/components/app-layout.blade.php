@@ -8,7 +8,7 @@
         ['label' => 'Timeline', 'route' => 'timeline.index', 'permission' => 'view timeline', 'icon' => 'timeline'],
         ['label' => 'Reports', 'route' => 'reports.index', 'permission' => 'view reports', 'icon' => 'chart'],
         ['label' => 'Clients', 'route' => 'clients.index', 'permission' => 'view clients', 'icon' => 'building'],
-        ['label' => 'Software', 'route' => 'software.index', 'permission' => 'view software', 'icon' => 'cube'],
+        ['label' => 'Software', 'route' => 'softwares.index', 'permission' => 'view software', 'icon' => 'cube'],
         ['label' => 'Settings', 'route' => 'settings.index', 'permission' => 'view settings', 'icon' => 'cog'],
     ];
 @endphp
@@ -37,7 +37,7 @@
             <nav class="mt-8 space-y-1">
                 @foreach ($menuItems as $item)
                     @if ($item['permission'] === null || auth()->user()->can($item['permission']))
-                        <a href="{{ route($item['route']) }}" @class(['app-shell-link', 'app-shell-link-active' => request()->routeIs($item['route'])])>
+                        <a href="{{ route($item['route']) }}" @class(['app-shell-link', 'app-shell-link-active' => request()->routeIs($item['route']) || request()->routeIs(str($item['route'])->before('.index').'.*')])>
                             <span class="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-200/80 text-xs font-black text-slate-500">{{ mb_substr($item['label'], 0, 1) }}</span>
                             <span>{{ $item['label'] }}</span>
                         </a>

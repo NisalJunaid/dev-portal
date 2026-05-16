@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\Client;
+use App\Models\Software;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
@@ -17,8 +18,27 @@ class DatabaseSeeder extends Seeder
         $this->call(RoleSeeder::class);
 
         $sampleClient = Client::firstOrCreate(
-            ['slug' => 'acme-health'],
-            ['name' => 'Acme Health', 'status' => 'active']
+            ['name' => 'Acme Health'],
+            [
+                'description' => 'Demo healthcare client workspace for seeded portal users.',
+                'status' => Client::STATUS_ACTIVE,
+            ]
+        );
+
+        Software::firstOrCreate(
+            ['client_id' => $sampleClient->id, 'name' => 'Patient Portal'],
+            [
+                'description' => 'Client-facing product used by Acme Health patients and staff.',
+                'is_enabled' => true,
+            ]
+        );
+
+        Software::firstOrCreate(
+            ['client_id' => $sampleClient->id, 'name' => 'Legacy Billing Console'],
+            [
+                'description' => 'Disabled demo product hidden from client users.',
+                'is_enabled' => false,
+            ]
         );
 
         $users = [
