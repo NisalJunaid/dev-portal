@@ -13,6 +13,8 @@ class Ticket extends Model
 
     public const STATUS_BACKLOG = 'backlog';
     public const STATUS_BUG_PENDING = 'bug_pending';
+    public const STATUS_BUG_BLOCKED = 'bug_blocked';
+    public const STATUS_BUG_COMPLETED = 'bug_completed';
     public const STATUS_FEATURE_APPROVED = 'feature_approved';
     public const STATUS_REJECTED = 'rejected';
 
@@ -21,7 +23,8 @@ class Ticket extends Model
 
     public const URGENCIES = ['critical', 'high', 'medium', 'low'];
     public const TYPES = [self::TYPE_BUG, self::TYPE_FEATURE];
-    public const STATUSES = [self::STATUS_BACKLOG, self::STATUS_BUG_PENDING, self::STATUS_FEATURE_APPROVED, self::STATUS_REJECTED];
+    public const BUG_STATUSES = [self::STATUS_BUG_PENDING, self::STATUS_BUG_BLOCKED, self::STATUS_BUG_COMPLETED];
+    public const STATUSES = [self::STATUS_BACKLOG, self::STATUS_BUG_PENDING, self::STATUS_BUG_BLOCKED, self::STATUS_BUG_COMPLETED, self::STATUS_FEATURE_APPROVED, self::STATUS_REJECTED];
 
     protected $fillable = [
         'client_id',
@@ -106,5 +109,15 @@ class Ticket extends Model
     public function formattedUrgency(): string
     {
         return str($this->urgency)->headline()->toString();
+    }
+
+    public function isBug(): bool
+    {
+        return $this->type === self::TYPE_BUG;
+    }
+
+    public function isCompletedBug(): bool
+    {
+        return $this->status === self::STATUS_BUG_COMPLETED;
     }
 }

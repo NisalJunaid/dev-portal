@@ -20,4 +20,16 @@
     .card {
         @apply rounded-3xl border border-slate-200 bg-white p-6 shadow-soft;
     }
+
+    .bug-card-ghost {
+        @apply border-rose-300 bg-rose-50 opacity-70;
+    }
+
+    .bug-card-chosen {
+        @apply scale-[1.01] shadow-soft;
+    }
+
+    .bug-card-drag {
+        @apply rotate-1 cursor-grabbing;
+    }
 }

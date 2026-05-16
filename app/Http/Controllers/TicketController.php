@@ -197,7 +197,7 @@ class TicketController extends Controller
         $software = Software::findOrFail($validated['software_id']);
         $oldValues = $ticket->only(['software_id', 'urgency', 'assigned_to', 'status', 'start_date', 'due_date', 'estimated_hours']);
 
-        $ticket->update([
+        $updates = [
             'client_id' => $software->client_id,
             'software_id' => $software->id,
             'urgency' => $validated['urgency'],
@@ -206,7 +206,17 @@ class TicketController extends Controller
             'start_date' => $validated['start_date'] ?? null,
             'due_date' => $validated['due_date'] ?? null,
             'estimated_hours' => $validated['estimated_hours'] ?? null,
-        ]);
+        ];
+
+        if ($ticket->type === Ticket::TYPE_BUG && $validated['status'] === Ticket::STATUS_BUG_COMPLETED) {
+            $updates['completed_at'] = $ticket->completed_at ?? now();
+            $updates['actual_completed_at'] = $ticket->actual_completed_at ?? now();
+        } elseif ($ticket->status === Ticket::STATUS_BUG_COMPLETED && $validated['status'] !== Ticket::STATUS_BUG_COMPLETED) {
+            $updates['completed_at'] = null;
+            $updates['actual_completed_at'] = null;
+        }
+
+        $ticket->update($updates);
 
         if ($oldValues['urgency'] !== $ticket->urgency) {
             $this->ticketActivityService->log($ticket, 'urgency changed', 'Ticket urgency updated.', $request->user(), $oldValues['urgency'], $ticket->urgency);

@@ -18,6 +18,7 @@ class RoleSeeder extends Seeder
         $permissions = [
             'view tickets',
             'view bugs',
+            'update bugs',
             'view features',
             'view sprints',
             'view timeline',
@@ -38,7 +39,7 @@ class RoleSeeder extends Seeder
         $roles = [
             'super_admin' => $permissions,
             'kiel_manager' => $permissions,
-            'developer' => ['view tickets', 'view bugs', 'view features', 'view sprints', 'view timeline', 'view reports', 'view clients', 'manage clients', 'view software', 'manage software'],
+            'developer' => ['view tickets', 'view bugs', 'update bugs', 'view features', 'view sprints', 'view timeline', 'view reports', 'view clients', 'manage clients', 'view software', 'manage software'],
             'client_admin' => ['view tickets', 'view bugs', 'view features', 'view sprints', 'view timeline', 'view reports', 'view software', 'view settings', 'manage own client'],
             'client_user' => ['view tickets', 'view bugs', 'view features', 'view sprints', 'view timeline', 'view reports', 'view software'],
         ];
