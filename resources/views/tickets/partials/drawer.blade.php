@@ -108,6 +108,12 @@
 
             const handleClick = async (event) => {
                 if (event.target.closest('[data-ticket-drawer-close]')) close();
+                const openChild = event.target.closest('[data-ticket-open]');
+                if (openChild) { event.preventDefault(); open(openChild.dataset.ticketOpen); return; }
+                const addSubFeature = event.target.closest('[data-add-subfeature]');
+                if (addSubFeature) { event.preventDefault(); window.dispatchEvent(new CustomEvent('kiel:add-subfeature', { detail: { parent_ticket_id: addSubFeature.dataset.parentTicketId } })); return; }
+                const addSubtask = event.target.closest('[data-add-subtask]');
+                if (addSubtask) { event.preventDefault(); window.dispatchEvent(new CustomEvent('kiel:add-subtask', { detail: { parent_ticket_id: addSubtask.dataset.parentTicketId } })); return; }
                 const button = event.target.closest('[data-drawer-action]');
                 if (!button) return;
                 const action = button.dataset.drawerAction;

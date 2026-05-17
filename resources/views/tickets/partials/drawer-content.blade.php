@@ -153,6 +153,29 @@
                 </section>
             @endif
 
+
+            <section class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div class="flex items-center justify-between gap-3">
+                    <h4 class="text-sm font-black uppercase tracking-[0.2em] text-slate-400">Sub-items</h4>
+                    @if ($ticket->isFeature())
+                        <button type="button" class="rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-bold" data-add-subfeature data-parent-ticket-id="{{ $ticket->id }}">Add sub-feature</button>
+                    @elseif ($ticket->isTask() && $isKielUser)
+                        <button type="button" class="rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-bold" data-add-subtask data-parent-ticket-id="{{ $ticket->id }}">Add subtask</button>
+                    @endif
+                </div>
+                @php $children = $ticket->children()->with('assignee')->get(); @endphp
+                <div class="mt-3 space-y-2">
+                    @forelse ($children as $child)
+                        <button type="button" class="flex w-full items-center justify-between rounded-xl border border-slate-100 px-3 py-2 text-left hover:bg-slate-50" data-ticket-open="{{ route('tickets.drawer', $child) }}">
+                            <span class="text-sm font-semibold text-slate-700">{{ $child->title }}</span>
+                            <span class="text-xs text-slate-500">{{ $child->formattedStatus() }}</span>
+                        </button>
+                    @empty
+                        <p class="text-sm text-slate-500">No sub-items yet.</p>
+                    @endforelse
+                </div>
+            </section>
+
             <section class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
                 <h4 class="text-sm font-black uppercase tracking-[0.2em] text-slate-400">Comments</h4>
                 <form method="POST" action="{{ route('tickets.comments.store', $ticket) }}" data-drawer-comment-form class="mt-4 space-y-3">

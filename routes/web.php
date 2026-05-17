@@ -63,6 +63,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/features/recommended', [FeatureController::class, 'recommended'])->name('features.recommended');
     Route::get('/features/{ticket}', [FeatureController::class, 'show'])->name('features.show');
     Route::patch('/features/{ticket}', [FeatureController::class, 'update'])->name('features.update');
+    Route::post('/features/request', [FeatureController::class, 'storeRequest'])->name('features.request.store');
     Route::post('/features/{ticket}/recommend', [FeatureController::class, 'recommend'])->name('features.recommend');
     Route::post('/features/{ticket}/approve-next-sprint', [FeatureController::class, 'approveNextSprint'])->name('features.approve-next-sprint');
     Route::post('/features/{ticket}/defer', [FeatureController::class, 'defer'])->name('features.defer');
