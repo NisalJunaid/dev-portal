@@ -1,96 +1,91 @@
 # Implementation Tracker
 
-## Completed: Feature request workflow and recommendation system
+## Completed: Sprint cycle management
 
 ### Summary
-Implemented a dedicated feature request workflow for tickets classified with `type = feature`. Feature requests now have their own list, recommendation queue, detail view, status transition endpoints, planning edit controls, client isolation, Kiel global review, and activity logging. This workflow is separate from centralized intake, the dedicated bug workflow, and future sprint cycle execution.
+Implemented sprint cycle management for feature delivery. Kiel users can now start a sprint for a selected client from that client's `next_sprint` feature queue, move those tickets into active delivery, complete the sprint, and review completed versus incomplete sprint analytics.
 
-### Feature statuses
-- `feature_approved`
-- `recommended`
-- `next_sprint`
+### Sprint statuses
+- `planned`
 - `in_progress`
-- `feature_blocked`
-- `feature_completed`
+- `completed`
 
 ### Database and model updates
-- Extended `App\Models\Ticket` with feature workflow status constants.
-- Added a `FEATURE_STATUSES` status list for feature-only queries and transition validation.
-- Added feature helper methods for checking whether a ticket is a feature and whether a feature is completed.
-- Feature completion sets both `completed_at` and `actual_completed_at`.
+- Added `sprints` table with client, optional software, sprint number, name, lifecycle status, start/end timestamps, duration, starter/ender user references, and timestamps.
+- Added `sprint_items` table to connect tickets to sprints with optional ordering positions.
+- Added `sprint_activities` table so sprint-level start and completion events have their own activity history.
+- Added `App\Models\Sprint` with status constants, client/software/user relationships, item relationship, ticket many-to-many relationship through `sprint_items`, activity relationship, and display helpers.
+- Added `App\Models\SprintItem` for sprint ticket membership.
+- Added `App\Models\SprintActivity` for sprint lifecycle audit entries.
+- Added `Client hasMany Sprints`.
+- Added `Software hasMany Sprints`.
+- Added `Ticket belongsToMany Sprints through sprint_items`.
 
 ### Controllers and routes
-- Added `FeatureController` for the dedicated feature workflow.
+- Added `SprintController` for sprint list, start form, detail, start action, and complete action.
 - Authenticated routes added for:
-  - `GET /features`
-  - `GET /features/recommended`
-  - `GET /features/{ticket}`
-  - `PATCH /features/{ticket}`
-  - `POST /features/{ticket}/recommend`
-  - `POST /features/{ticket}/approve-next-sprint`
-  - `POST /features/{ticket}/defer`
-  - `POST /features/{ticket}/complete`
-- Feature routes only expose tickets where `type = feature` and status is one of the feature workflow statuses.
-- Client users can view and recommend feature tickets that belong to their own client workspace.
-- Kiel users can view features globally, review the recommendation queue, edit planning fields, move approved or recommended features to `next_sprint`, defer recommendations, and complete features.
-- The old placeholder `/features` route was replaced with the dedicated feature workflow route.
+  - `GET /sprints`
+  - `GET /sprints/start`
+  - `GET /sprints/{sprint}`
+  - `POST /sprints/start`
+  - `POST /sprints/{sprint}/complete`
+- Replaced the old placeholder `/sprints` route with the dedicated sprint workflow.
+- Sprint visibility is scoped by client for non-Kiel users and global for Kiel users.
+- Sprint start and completion actions are restricted to Kiel users.
 
-### Feature workflow rules
-- Client users can recommend only approved features for the next planning cycle.
-- Recommended features move from `feature_approved` to `recommended`.
-- Kiel users can move `feature_approved` or `recommended` features to `next_sprint`.
-- Kiel users can defer a `recommended` feature back to `feature_approved` with an optional reason recorded in activity.
-- Kiel users can reject a recommendation from the feature detail view using the existing formal ticket rejection endpoint.
-- Kiel users can mark a feature completed, which moves it to `feature_completed` and records completion timestamps.
-- Kiel users can edit:
-  - Title
-  - Description
-  - Urgency
-  - Assignee
-  - Start date
-  - Due date
-  - Estimated hours
+### Start sprint behavior
+- Kiel selects a client from the start sprint page.
+- System finds all feature tickets for that client with status `next_sprint`.
+- System blocks starting a second overlapping sprint for a client that already has an `in_progress` sprint.
+- System creates a new sprint with a client-scoped incrementing `sprint_no`.
+- Sprint name uses the format `Sprint Cycle {number} - {date}`.
+- If all selected tickets belong to one software record, the sprint stores that `software_id`; otherwise the sprint software remains nullable for multi-software cycles.
+- All selected next sprint tickets are copied into `sprint_items` with positions.
+- All selected tickets move to `in_progress`.
+- The sprint moves to `in_progress` and records `started_at` plus `started_by`.
+- Activity is logged on the sprint and each ticket.
+
+### Continuous planning
+- Clients can continue recommending approved feature requests while a sprint is in progress.
+- Recommended and future `next_sprint` items are not blocked by an active sprint; they remain outside the current sprint until Kiel starts the next cycle.
+
+### Complete sprint behavior
+- Completing a sprint records `ended_at`, calculates `duration_seconds`, sets status to `completed`, and records `ended_by`.
+- Sprint completion logs a sprint activity summary with completed and incomplete item counts.
+- Completed items are summarized from sprint tickets with status `feature_completed`.
+- Incomplete items remain visible on the sprint detail page for Kiel review and are not automatically hidden or overwritten.
 
 ### Views and UI
 - Added Blade views for:
-  - `resources/views/features/index.blade.php`
-  - `resources/views/features/recommended.blade.php`
-  - `resources/views/features/show.blade.php`
-- Feature list view includes ticket, client/software, status, urgency, assignment, schedule, and actions.
-- Feature detail view includes description, comments, activity timeline, metadata, recommendation controls, Kiel workflow controls, and Kiel planning edit form.
-- Recommended feature review view gives Kiel users focused actions to move recommendations to the next sprint or defer them.
-
-### Feature filtering
-- Feature list supports:
-  - Search across ticket number, title, and description
-  - Filter by client for Kiel users
-  - Filter by software
-  - Filter by urgency
-  - Filter by status
-  - Filter by assignee
-
-### Activity logging
-Activity entries are recorded for:
-- `recommended`
-- `moved to next sprint`
-- `deferred`
-- `completed`
-- `feature details updated`
-
-### Client isolation
-- Non-Kiel users only query feature tickets where `client_id` matches their own user record.
-- Direct feature detail and workflow actions enforce the same client boundary.
-- Kiel users can query globally and use the client filter on the feature list.
+  - `resources/views/sprints/index.blade.php`
+  - `resources/views/sprints/start.blade.php`
+  - `resources/views/sprints/show.blade.php`
+- Sprint list supports client and status filtering.
+- Sprint start page shows each client's ready `next_sprint` feature count and disables clients with no ready features or an active sprint.
+- Sprint detail page shows:
+  - Sprint name
+  - Client
+  - Software
+  - Start time
+  - End time
+  - Duration
+  - Completed tickets
+  - Incomplete tickets for Kiel review
+  - Sprint activity history
+  - Ticket activity history for sprint items
 
 ### Verification performed
-- PHP syntax checks passed for changed application, route, and feature workflow test PHP files.
-- Added `FeatureWorkflowTest` coverage for:
-  - Client recommendation flow.
-  - Client isolation when recommending another client's feature.
-  - Kiel approval of a recommended feature to `next_sprint`.
-- `php artisan test --filter=FeatureWorkflowTest` was attempted but could not run because `vendor/autoload.php` is unavailable until Composer dependencies are installed.
-- `composer install --no-interaction --prefer-dist` was attempted but could not complete because `composer.lock` is out of sync with `composer.json` and does not contain required packages including `spatie/laravel-permission` and `laravel/breeze`.
-- Full browser-based feature workflow testing could not be executed in this environment because Composer dependencies are unavailable and the app cannot boot.
+- Added `SprintWorkflowTest` coverage for:
+  - Kiel starting a sprint from `next_sprint` feature tickets end-to-end.
+  - Sprint items being created in order.
+  - Ticket statuses moving to `in_progress`.
+  - Future recommendations remaining outside the active sprint.
+  - Sprint and ticket activity logging on start.
+  - Kiel completing a sprint.
+  - Completed analytics showing completed and incomplete tickets on the sprint detail page.
+- PHP syntax checks passed for sprint models, controller, migrations, routes, and sprint workflow tests.
+- `php artisan test --filter=SprintWorkflowTest` was attempted but could not run because `vendor/autoload.php` is unavailable until Composer dependencies are installed.
+- Full browser-based sprint workflow testing could not be executed in this environment because Composer dependencies are unavailable and the app cannot boot.
 
 ### Next planned task
-Implement sprint cycles, start sprint, complete sprint, and sprint analytics.
+Implement time tracking start, pause, resume, stop, and reporting data.
