@@ -21,7 +21,7 @@ return new class extends Migration
             $table->string('title');
             $table->text('description');
             $table->enum('urgency', ['critical', 'high', 'medium', 'low']);
-            $table->enum('type', ['bug', 'feature'])->nullable();
+            $table->enum('type', ['bug', 'feature', 'task'])->nullable();
             $table->string('status')->default('backlog');
             $table->text('rejection_reason')->nullable();
             $table->timestamp('submitted_at');

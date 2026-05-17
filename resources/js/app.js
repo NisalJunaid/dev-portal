@@ -106,6 +106,13 @@ const taskColumnDefinitions = [
     { key: 'updated_at', label: 'Last updated', min: 180, defaultWidth: 200, max: 700 },
 ];
 window.Kiel = { csrfToken, request, toast, confirm, setLoading, errorMessage, taskColumnsConfig: taskColumnDefinitions };
+window.KielTasks = window.KielTasks || {};
+window.KielTasks.emitTaskUpdated = function (ticket) {
+    window.dispatchEvent(new CustomEvent('kiel:task-updated', { detail: { ticket } }));
+};
+window.KielTasks.emitTaskCreated = function (ticket) {
+    window.dispatchEvent(new CustomEvent('kiel:task-created', { detail: { ticket } }));
+};
 
 
 
@@ -274,7 +281,7 @@ const handleKanbanDrop = async (board, evt) => {
     const destinationIds = Array.from(evt.to.querySelectorAll('[data-kanban-card]')).map((el) => Number(el.dataset.ticketId));
     const sourceIds = Array.from(evt.from.querySelectorAll('[data-kanban-card]')).map((el) => Number(el.dataset.ticketId));
     const insertBack = () => {
-        if (typeof evt.oldIndex !== 'number') return window.location.reload();
+        if (typeof evt.oldIndex !== 'number') return;
         const siblings = evt.from.querySelectorAll('[data-kanban-card]');
         const ref = siblings[evt.oldIndex] || null;
         evt.from.insertBefore(card, ref);
@@ -283,6 +290,7 @@ const handleKanbanDrop = async (board, evt) => {
         if (movedAcrossColumns) {
             const payload = await window.Kiel.request(card.dataset.moveUrl, { method: 'PATCH', body: JSON.stringify({ column: destinationColumn, position: evt.newIndex ?? 0, view: boardView }) });
             if (payload?.ticket?.column) card.dataset.currentColumn = payload.ticket.column;
+            if (payload?.ticket) window.KielTasks.emitTaskUpdated(payload.ticket);
         }
         await window.Kiel.request(board.dataset.reorderUrl, { method: 'PATCH', body: JSON.stringify({ column: destinationColumn, tickets: destinationIds, view: boardView }) });
         if (movedAcrossColumns && sourceIds.length > 0) {

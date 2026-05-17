@@ -402,3 +402,30 @@ Production hardening and deployment preparation.
 
 ### Next planned task
 Production hardening and deployment preparation.
+
+## Completed: Task enum fix + sprint dashboard workflow pass + task event sync foundation
+
+### Summary
+- Fixed `tickets.type` enum mismatch causing SQL truncation when creating `type=task` records.
+- Updated sprints planning page to a compact table-first dashboard with feature backlog/approved sections and sprint control actions.
+- Added global frontend task update event emitters for cross-view synchronization hooks.
+
+### Files changed
+- `database/migrations/2026_05_16_020000_create_tickets_table.php`
+- `database/migrations/2026_05_17_120000_update_tickets_type_enum_to_include_task.php`
+- `resources/views/sprints/index.blade.php`
+- `resources/js/app.js`
+- `tests/Feature/TicketTypeTaskCreationTest.php`
+
+### Migrations / checks run
+- `php artisan migrate`
+- `php artisan test`
+- `php artisan route:list`
+- `php artisan view:clear`
+- `php artisan optimize:clear`
+
+### Known issues
+- Full command execution remains environment-dependent if Composer vendor dependencies are not present.
+
+### Next planned task
+Production hardening and deployment preparation.
