@@ -186,3 +186,10 @@ body.is-column-resizing { cursor: col-resize; user-select: none; }
     font-weight: 700;
     transform: translateY(-2px);
 }
+
+[data-timeline-chart],
+[data-timeline-chart] .gantt-container,
+[data-timeline-chart] svg {
+    height: 100%;
+    min-height: 100%;
+}

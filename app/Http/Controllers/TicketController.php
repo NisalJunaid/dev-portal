@@ -129,7 +129,7 @@ class TicketController extends Controller
         ]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request): JsonResponse|RedirectResponse
     {
         abort_unless($request->user()->can('view tickets'), 403);
 
@@ -161,6 +161,16 @@ class TicketController extends Controller
 
             return $ticket;
         });
+
+        if ($request->expectsJson()) {
+            $ticket->load(['client', 'software', 'assignee', 'sprints']);
+
+            return response()->json([
+                'message' => $ticket->ticket_no.' created successfully.',
+                'ticket' => $this->inlineTicketPayload($ticket),
+                'drawer_url' => route('tickets.drawer', $ticket),
+            ], 201);
+        }
 
         return redirect()->route('tickets.show', $ticket)->with('status', $ticket->ticket_no.' submitted successfully.');
     }

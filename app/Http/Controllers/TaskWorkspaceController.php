@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Services\KanbanService;
 use App\Services\TimelineService;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -91,4 +92,29 @@ class TaskWorkspaceController extends Controller
             'canMove' => $request->user()->isKielUser() || $request->user()->isClientUser(),
         ]);
     }
+
+    public function partial(Request $request): JsonResponse
+    {
+        abort_unless($request->user()->can('view tickets'), 403);
+        $view = $request->query('view', 'list');
+
+        return response()->json([
+            'html' => match ($view) {
+                'board' => view('tasks.partials.kanban-view', [
+                    'activeView' => 'all',
+                    'columns' => $this->kanbanService->columnsFor(KanbanService::VIEW_ALL),
+                    'ticketsByColumn' => $this->kanbanService->groupedTickets($request->user(), KanbanService::VIEW_ALL),
+                    'canMove' => $request->user()->isKielUser() || $request->user()->isClientUser(),
+                ])->render(),
+                default => view('tasks.partials.list-view', [
+                    'tickets' => Ticket::query()->visibleTo($request->user())->with(['client', 'software', 'submitter', 'assignee', 'sprints'])->withExists(['activeBlock as is_blocked'])->latest('updated_at')->paginate(25),
+                    'sort' => 'updated_at',
+                    'direction' => 'desc',
+                    'teamMembers' => User::role(['super_admin', 'kiel_manager', 'developer'])->orderBy('name')->get(['id', 'name']),
+                    'isKielUser' => $request->user()->isKielUser(),
+                ])->render(),
+            },
+        ]);
+    }
+
 }

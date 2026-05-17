@@ -249,3 +249,37 @@ Production hardening and deployment preparation.
 
 ### Next planned task
 Production hardening and deployment preparation.
+
+## Completed: Remaining Tasks workspace UI/UX + drawer-based task creation
+
+### Summary
+- fixed show/hide list+board dropdown immediate-close behavior by moving to shared `openMenu` + root `@click` close + Escape close with `@click.stop` on triggers/panels.
+- removed visible toolbar `Tasks` text next to view switch icons.
+- renamed `Create Ticket` CTA to `Create Task`.
+- added create-task right drawer on `/tasks` with AJAX submission and inline validation messages.
+- added JSON response branch in `TicketController@store` while preserving existing redirect for non-JSON requests.
+- added tasks partial refresh endpoint and client-side refresh flow for list/board; timeline refresh hooks call timeline reload entrypoint.
+- removed `Scheduled tasks` heading text in timeline view.
+- adjusted timeline empty/content region sizing to keep a full-height rows area.
+
+### Files changed
+- `resources/views/tasks/index.blade.php`
+- `resources/views/tasks/partials/create-task-drawer.blade.php`
+- `resources/views/tasks/partials/timeline-view.blade.php`
+- `app/Http/Controllers/TicketController.php`
+- `app/Http/Controllers/TaskWorkspaceController.php`
+- `routes/web.php`
+- `resources/css/app.css`
+- `docs/IMPLEMENTATION_TRACKER.md`
+
+### Tests/checks run
+- `php artisan view:clear`
+- `php artisan optimize:clear`
+- `php artisan route:list`
+- `php artisan test`
+
+### Known issues
+- timeline/list/board refresh endpoint currently returns safe server-rendered partials and does not yet re-apply every active filter/sort input for list refresh; functional no-reload updates are in place.
+
+### Next planned task
+Production hardening and deployment preparation.

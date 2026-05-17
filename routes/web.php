@@ -28,6 +28,7 @@ Route::middleware('auth')->group(function () {
     Route::resource('softwares', SoftwareController::class)->only(['index', 'create', 'store', 'edit', 'update']);
 
     Route::get('/tasks', [TaskWorkspaceController::class, 'index'])->name('tasks.index');
+    Route::get('/tasks/partial', [TaskWorkspaceController::class, 'partial'])->name('tasks.partial');
     Route::get('/kanban', fn () => redirect()->route('tasks.index', ['view' => 'board']))->name('kanban.index');
     Route::get('/timeline', fn () => redirect()->route('tasks.index', ['view' => 'timeline']))->name('timeline.index');
     Route::get('/timeline/data', [TimelineController::class, 'data'])->name('timeline.data');
