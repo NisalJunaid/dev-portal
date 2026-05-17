@@ -22,8 +22,7 @@
             resume: @js(route('tickets.timer.resume', $ticket)),
             stop: @js(route('tickets.timer.stop', $ticket)),
         },
-        csrf: @js(csrf_token()),
-    })"
+            })"
     x-init="init()"
 >
     <div class="flex items-start justify-between gap-3">
@@ -75,8 +74,7 @@
             cumulativeSeconds: config.cumulativeSeconds,
             displaySeconds: config.timer?.current_duration_seconds ?? 0,
             routes: config.routes,
-            csrf: config.csrf,
-            saving: false,
+                        saving: false,
             savingAction: null,
             message: '',
             error: '',
@@ -110,33 +108,30 @@
                 this.displaySeconds = (this.timer.duration_seconds ?? 0) + elapsed;
             },
             async send(action) {
+                if (action === 'stop') {
+                    const confirmed = await window.Kiel.confirm({
+                        title: 'Stop timer?',
+                        message: 'This will complete the active timer and add elapsed time to the ticket.',
+                        confirmLabel: 'Stop timer',
+                    });
+                    if (!confirmed) return;
+                }
                 this.saving = true;
                 this.savingAction = action;
                 this.message = '';
                 this.error = '';
 
                 try {
-                    const response = await fetch(this.routes[action], {
-                        method: 'POST',
-                        headers: {
-                            'Accept': 'application/json',
-                            'Content-Type': 'application/json',
-                            'X-CSRF-TOKEN': this.csrf,
-                        },
-                        body: JSON.stringify({}),
-                    });
-                    const data = await response.json();
-
-                    if (!response.ok) {
-                        throw new Error(data.message || 'Unable to update the timer.');
-                    }
+                    const data = await window.Kiel.request(this.routes[action], { method: 'POST' });
 
                     this.timer = data.timer.status === 'completed' ? null : data.timer;
                     this.cumulativeSeconds = data.ticket.cumulative_duration_seconds;
                     this.displaySeconds = this.timer?.current_duration_seconds ?? 0;
                     this.message = data.message;
+                    window.Kiel?.toast(data.message || 'Timer updated.');
                 } catch (e) {
                     this.error = e.message || 'Unable to update the timer.';
+                    window.Kiel?.toast(this.error, 'error');
                 } finally {
                     this.saving = false;
                     this.savingAction = null;

@@ -138,8 +138,7 @@
                         bug_blocked: 'block',
                         bug_completed: 'complete',
                     };
-                    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-                    const toast = board.querySelector('[data-bug-toast]');
+                                        const toast = board.querySelector('[data-bug-toast]');
 
                     const showToast = (message) => {
                         if (! toast) {
@@ -147,6 +146,7 @@
                         }
 
                         toast.textContent = message || 'Unable to update bug status.';
+                        window.Kiel?.toast(toast.textContent, 'error');
                         toast.classList.remove('hidden');
                         window.setTimeout(() => toast.classList.add('hidden'), 5000);
                     };
@@ -212,20 +212,10 @@
                                     card.classList.add('opacity-60', 'pointer-events-none');
 
                                     try {
-                                        const response = await fetch(url, {
+                                        await window.Kiel.request(url, {
                                             method: 'POST',
-                                            headers: {
-                                                Accept: 'application/json',
-                                                'Content-Type': 'application/json',
-                                                'X-CSRF-TOKEN': csrf,
-                                            },
                                             body: JSON.stringify({ status: newStatus }),
                                         });
-
-                                        if (! response.ok) {
-                                            const payload = await response.json().catch(() => ({}));
-                                            throw new Error(payload.message || 'Unable to update bug status.');
-                                        }
 
                                         card.dataset.currentStatus = newStatus;
                                         refreshEmptyStates();

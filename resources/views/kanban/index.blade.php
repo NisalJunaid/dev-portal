@@ -24,10 +24,10 @@
         >
             <div data-kanban-toast class="hidden rounded-2xl border px-5 py-4 text-sm font-bold"></div>
 
-            <div class="flex gap-5 overflow-x-auto pb-4">
+            <div class="grid auto-cols-[minmax(18rem,20rem)] grid-flow-col gap-4 overflow-x-auto pb-4 sm:auto-cols-[20rem] lg:gap-5">
                 @foreach ($columns as $columnKey => $label)
                     @php($columnTickets = $ticketsByColumn[$columnKey] ?? collect())
-                    <div class="w-80 shrink-0 rounded-3xl border border-slate-200 bg-slate-100/80 p-4">
+                    <div class="w-full rounded-3xl border border-slate-200 bg-slate-100/80 p-4">
                         <div class="mb-4 flex items-start justify-between gap-3">
                             <div>
                                 <h3 class="text-sm font-black uppercase tracking-[0.2em] text-slate-700">{{ $label }}</h3>
@@ -39,7 +39,7 @@
                         <div
                             data-kanban-column
                             data-column="{{ $columnKey }}"
-                            class="min-h-[34rem] space-y-3 rounded-2xl border border-dashed border-slate-300 bg-white/60 p-3"
+                            class="min-h-[28rem] space-y-3 rounded-2xl border border-dashed border-slate-300 bg-white/60 p-3 sm:min-h-[34rem]"
                         >
                             @forelse ($columnTickets as $ticket)
                                 @include('kanban.partials.card', ['ticket' => $ticket, 'activeView' => $activeView])
@@ -64,11 +64,12 @@
             const board = document.querySelector('[data-kanban-board]');
             if (! board) return;
 
-            const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
             const toast = board.querySelector('[data-kanban-toast]');
             const view = board.dataset.view;
 
             const showToast = (message, type = 'success') => {
+                window.Kiel?.toast(message, type);
+                if (! toast) return;
                 toast.textContent = message;
                 toast.className = `rounded-2xl border px-5 py-4 text-sm font-bold ${type === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-rose-200 bg-rose-50 text-rose-800'}`;
                 window.setTimeout(() => toast.classList.add('hidden'), 4000);
@@ -79,7 +80,7 @@
             const refreshColumn = (column) => {
                 const cards = cardsFor(column);
                 column.querySelector('[data-empty-state]')?.classList.toggle('hidden', cards.length > 0);
-                column.closest('.w-80')?.querySelector('[data-column-count]')?.replaceChildren(document.createTextNode(cards.length));
+                column.closest('.rounded-3xl')?.querySelector('[data-column-count]')?.replaceChildren(document.createTextNode(cards.length));
             };
             const refreshAll = () => board.querySelectorAll('[data-kanban-column]').forEach(refreshColumn);
             const revertDrop = (event) => {
@@ -100,13 +101,10 @@
                 const columnKey = column.dataset.column;
                 setSaving(columnKey, true);
                 try {
-                    const response = await fetch(board.dataset.reorderUrl, {
+                    const payload = await window.Kiel.request(board.dataset.reorderUrl, {
                         method: 'PATCH',
-                        headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf },
                         body: JSON.stringify({ tickets: ids, column: columnKey, view }),
                     });
-                    const payload = await response.json().catch(() => ({}));
-                    if (! response.ok) throw new Error(payload.message || 'Unable to save order.');
                     showToast(payload.message || 'Order saved.');
                 } catch (error) {
                     showToast(error.message, 'error');
@@ -122,7 +120,9 @@
                 board.querySelectorAll('[data-kanban-column]').forEach((column) => {
                     window.Sortable.create(column, {
                         group: 'tickets-kanban',
-                        animation: 180,
+                        animation: 220,
+                        easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+                        fallbackTolerance: 4,
                         draggable: '[data-kanban-card]',
                         ghostClass: 'kanban-card-ghost',
                         chosenClass: 'kanban-card-chosen',
@@ -142,13 +142,10 @@
                             card.classList.add('opacity-60', 'pointer-events-none');
                             try {
                                 if (newColumn !== oldColumn) {
-                                    const response = await fetch(card.dataset.moveUrl, {
+                                    const payload = await window.Kiel.request(card.dataset.moveUrl, {
                                         method: 'PATCH',
-                                        headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf },
                                         body: JSON.stringify({ column: newColumn, position: event.newIndex, view }),
                                     });
-                                    const payload = await response.json().catch(() => ({}));
-                                    if (! response.ok) throw new Error(payload.message || 'That move is not allowed.');
                                     syncCard(card, payload.ticket);
                                     showToast(payload.message || 'Ticket saved.');
                                 }

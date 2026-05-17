@@ -2,6 +2,195 @@ import './bootstrap';
 
 import Alpine from 'alpinejs';
 
+const csrfToken = () => document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+
+const parseResponse = async (response) => {
+    const contentType = response.headers.get('content-type') || '';
+
+    if (contentType.includes('application/json')) {
+        return response.json();
+    }
+
+    return { html: await response.text() };
+};
+
+const errorMessage = (payload, fallback = 'Something went wrong. Please try again.') => {
+    if (payload?.errors) {
+        const firstField = Object.keys(payload.errors)[0];
+        const firstError = payload.errors[firstField]?.[0];
+
+        if (firstError) return firstError;
+    }
+
+    return payload?.message || fallback;
+};
+
+const request = async (url, options = {}) => {
+    const headers = new Headers(options.headers || {});
+    headers.set('Accept', headers.get('Accept') || 'application/json');
+
+    const hasBody = options.body !== undefined && !(options.body instanceof FormData);
+    if (hasBody && !headers.has('Content-Type')) {
+        headers.set('Content-Type', 'application/json');
+    }
+
+    const method = (options.method || 'GET').toUpperCase();
+    if (!['GET', 'HEAD'].includes(method) && !headers.has('X-CSRF-TOKEN')) {
+        headers.set('X-CSRF-TOKEN', csrfToken());
+    }
+
+    const response = await fetch(url, { ...options, headers });
+    const payload = await parseResponse(response).catch(() => ({}));
+
+    if (!response.ok) {
+        const error = new Error(errorMessage(payload));
+        error.response = response;
+        error.payload = payload;
+        throw error;
+    }
+
+    return payload;
+};
+
+const toast = (message, type = 'success') => {
+    window.dispatchEvent(new CustomEvent('kiel:toast', { detail: { message, type } }));
+};
+
+const confirm = (options = {}) => new Promise((resolve) => {
+    window.dispatchEvent(new CustomEvent('kiel:confirm', {
+        detail: {
+            title: options.title || 'Confirm action',
+            message: options.message || 'Are you sure you want to continue?',
+            confirmLabel: options.confirmLabel || 'Confirm',
+            cancelLabel: options.cancelLabel || 'Cancel',
+            tone: options.tone || 'danger',
+            resolve,
+        },
+    }));
+});
+
+const setLoading = (element, loading = true, label = 'Saving…') => {
+    if (!element) return;
+
+    if (loading) {
+        if (!element.dataset.originalHtml) element.dataset.originalHtml = element.innerHTML;
+        element.disabled = true;
+        element.setAttribute('aria-busy', 'true');
+        element.classList.add('opacity-70', 'pointer-events-none');
+        element.innerHTML = `<span class="inline-flex items-center gap-2"><span class="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent"></span>${label}</span>`;
+    } else {
+        element.disabled = false;
+        element.removeAttribute('aria-busy');
+        element.classList.remove('opacity-70', 'pointer-events-none');
+        if (element.dataset.originalHtml) {
+            element.innerHTML = element.dataset.originalHtml;
+            delete element.dataset.originalHtml;
+        }
+    }
+};
+
+window.Kiel = { csrfToken, request, toast, confirm, setLoading, errorMessage };
+
+
+const bindAjaxActions = () => {
+    document.addEventListener('submit', async (event) => {
+        const form = event.target.closest('form[data-ajax-action]');
+        if (!form) return;
+
+        event.preventDefault();
+
+        if (form.dataset.confirmTitle) {
+            const confirmed = await confirm({
+                title: form.dataset.confirmTitle,
+                message: form.dataset.confirmMessage,
+                confirmLabel: form.dataset.confirmLabel,
+            });
+            if (!confirmed) return;
+        }
+
+        const submitter = form.querySelector('[type="submit"]');
+        setLoading(submitter, true, form.dataset.savingLabel || 'Saving…');
+
+        try {
+            const payload = await request(form.action, {
+                method: (form.dataset.method || form.method || 'POST').toUpperCase(),
+                body: new FormData(form),
+            });
+            toast(payload.message || form.dataset.successMessage || 'Saved.');
+
+            if (form.dataset.removeOnSuccess) {
+                form.closest(form.dataset.removeOnSuccess)?.remove();
+            }
+
+            if (form.dataset.replaceWithStatus) {
+                form.outerHTML = `<span class="badge badge-status">${payload.ticket?.status_label || 'Updated'}</span>`;
+            }
+        } catch (error) {
+            toast(error.message || 'Unable to save.', 'error');
+        } finally {
+            setLoading(submitter, false);
+        }
+    });
+};
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', bindAjaxActions, { once: true });
+} else {
+    bindAjaxActions();
+}
+
+
 window.Alpine = Alpine;
+
+Alpine.data('toastCenter', () => ({
+    toasts: [],
+    init() {
+        window.addEventListener('kiel:toast', (event) => this.push(event.detail.message, event.detail.type));
+    },
+    push(message, type = 'success') {
+        const id = Date.now() + Math.random();
+        this.toasts.push({ id, message, type });
+        setTimeout(() => this.remove(id), 5000);
+    },
+    remove(id) {
+        this.toasts = this.toasts.filter((toastItem) => toastItem.id !== id);
+    },
+    toneClasses(type) {
+        return {
+            success: 'border-emerald-200 bg-emerald-50 text-emerald-800',
+            error: 'border-rose-200 bg-rose-50 text-rose-800',
+            warning: 'border-amber-200 bg-amber-50 text-amber-800',
+            info: 'border-indigo-200 bg-indigo-50 text-indigo-800',
+        }[type] || 'border-slate-200 bg-white text-slate-800';
+    },
+}));
+
+Alpine.data('confirmModal', () => ({
+    open: false,
+    title: 'Confirm action',
+    message: '',
+    confirmLabel: 'Confirm',
+    cancelLabel: 'Cancel',
+    tone: 'danger',
+    resolver: null,
+    init() {
+        window.addEventListener('kiel:confirm', (event) => {
+            Object.assign(this, event.detail);
+            this.resolver = event.detail.resolve;
+            this.open = true;
+            this.$nextTick(() => this.$refs.confirmButton?.focus());
+        });
+    },
+    answer(value) {
+        this.open = false;
+        this.resolver?.(value);
+        this.resolver = null;
+    },
+    confirmClasses() {
+        return this.tone === 'danger'
+            ? 'bg-rose-600 text-white hover:bg-rose-700'
+            : 'bg-indigo-600 text-white hover:bg-indigo-700';
+    },
+}));
 
 Alpine.start();

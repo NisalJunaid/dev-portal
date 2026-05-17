@@ -90,13 +90,13 @@
                                     <p class="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{{ $feature->description }}</p>
                                 </td>
                                 <td class="px-5 py-4 font-semibold text-slate-600"><span class="block text-slate-900">{{ $feature->client->name }}</span>{{ $feature->software->name }}</td>
-                                <td class="px-5 py-4"><span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-black uppercase tracking-wide text-slate-700">{{ $feature->formattedStatus() }}</span></td>
-                                <td class="px-5 py-4"><span @class(['rounded-full px-3 py-1 text-xs font-black uppercase tracking-wide', 'bg-rose-100 text-rose-700' => $feature->urgency === 'critical', 'bg-orange-100 text-orange-700' => $feature->urgency === 'high', 'bg-amber-100 text-amber-700' => $feature->urgency === 'medium', 'bg-emerald-100 text-emerald-700' => $feature->urgency === 'low'])>{{ $feature->formattedUrgency() }}</span></td>
+                                <td class="px-5 py-4"><span class="badge badge-status">{{ $feature->formattedStatus() }}</span></td>
+                                <td class="px-5 py-4"><span @class(['badge', 'badge-urgency-critical' => $feature->urgency === 'critical', 'badge-urgency-high' => $feature->urgency === 'high', 'badge-urgency-medium' => $feature->urgency === 'medium', 'badge-urgency-low' => $feature->urgency === 'low'])>{{ $feature->formattedUrgency() }}</span></td>
                                 <td class="px-5 py-4 font-semibold text-slate-600">{{ $feature->assignee?->name ?? 'Unassigned' }}</td>
                                 <td class="px-5 py-4 text-xs font-semibold leading-5 text-slate-500">Start: {{ $feature->start_date?->format('M j, Y') ?? '—' }}<br>Due: {{ $feature->due_date?->format('M j, Y') ?? '—' }}</td>
                                 <td class="px-5 py-4 text-right">
                                     @if ($feature->status === App\Models\Ticket::STATUS_FEATURE_APPROVED)
-                                        <form method="POST" action="{{ route('features.recommend', $feature) }}">
+                                        <form method="POST" action="{{ route('features.recommend', $feature) }}" data-ajax-action data-confirm-title="Recommend feature?" data-confirm-message="This will move the feature into the recommended planning queue." data-confirm-label="Recommend" data-replace-with-status>
                                             @csrf
                                             <button type="submit" class="rounded-2xl border border-indigo-200 bg-indigo-50 px-4 py-2 text-xs font-black text-indigo-700">Recommend</button>
                                         </form>
