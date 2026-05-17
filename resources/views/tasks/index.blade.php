@@ -1,7 +1,7 @@
 <x-app-layout>
     <x-slot name="header">Tasks</x-slot>
 
-    <div x-data="taskWorkspace({ initialView: @js($activeView), initialFiltersOpen: false })" x-init="init()" class="tasks-shell">
+    <div x-data="taskWorkspace({ initialView: @js($activeView), initialFiltersOpen: false, boardColumns: @js(collect($kanbanColumns)->map(fn($label, $key) => ['key' => $key, 'label' => $label])->values()) })" x-init="init()" class="tasks-shell">
         <div class="tasks-workspace">
             <section class="tasks-toolbar">
                 <div class="flex items-center gap-3">
@@ -15,30 +15,51 @@
                     </div>
                 </div>
 
-                <div class="relative flex items-center gap-2" @keydown.escape.window="showColumnsMenu = false">
+                <div class="relative flex items-center gap-2" @keydown.escape.window="showListColumnsMenu = false; showBoardColumnsMenu = false">
                     <button type="button" class="inline-flex items-center rounded-xl border border-slate-200 p-2 text-slate-700 transition hover:border-slate-300" title="Filters" @click="toggleFilters" :aria-expanded="showFilters.toString()">
                         <span class="sr-only">Filters</span><svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M3 5h14v2H3V5zm3 4h8v2H6V9zm3 4h2v2H9v-2z"/></svg>
                     </button>
 
-                    <button x-cloak x-show="activeView === 'list'" type="button" class="relative inline-flex items-center rounded-xl border border-slate-200 p-2 text-slate-700 transition hover:border-slate-300" title="Columns" @click="toggleColumnsMenu" :aria-expanded="showColumnsMenu.toString()">
-                        <span class="sr-only">Columns</span><svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M3 4h14v12H3V4Zm4 1H4v10h3V5Zm1 0v10h4V5H8Zm5 0v10h3V5h-3Z"/></svg>
-                        <span x-show="$store.taskColumns.hiddenCount() > 0" class="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-indigo-500"></span>
-                    </button>
+                    <div class="relative" x-cloak x-show="activeView === 'list'" @click.outside="showListColumnsMenu = false">
+                        <button type="button" class="relative inline-flex items-center rounded-xl border border-slate-200 p-2 text-slate-700 transition hover:border-slate-300" title="Columns" @click.stop="toggleListColumnsMenu" :aria-expanded="showListColumnsMenu.toString()">
+                            <span class="sr-only">Columns</span><svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M3 4h14v12H3V4Zm4 1H4v10h3V5Zm1 0v10h4V5H8Zm5 0v10h3V5h-3Z"/></svg>
+                            <span x-show="$store.taskColumns.hiddenCount() > 0" class="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-indigo-500"></span>
+                        </button>
 
-                    <div x-cloak x-show="showColumnsMenu && activeView === 'list'" @click.outside="showColumnsMenu = false" x-transition.opacity.duration.150ms x-transition:enter-start="scale-95" x-transition:enter-end="scale-100" class="absolute right-0 top-12 z-20 w-64 rounded-xl border border-slate-200 bg-white p-3 shadow-xl">
-                        <p class="mb-2 text-xs font-black uppercase tracking-widest text-slate-500">Visible columns</p>
-                        <div class="max-h-72 space-y-1 overflow-y-auto sleek-scrollbar">
-                            <template x-for="column in $store.taskColumns.columns" :key="column.key">
-                                <label class="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-50">
-                                    <input type="checkbox" class="rounded border-slate-300 text-indigo-600" :checked="$store.taskColumns.isVisible(column.key)" @change="$store.taskColumns.toggle(column.key)">
-                                    <span x-text="column.label"></span>
-                                </label>
-                            </template>
+                        <div x-cloak x-show="showListColumnsMenu && activeView === 'list'" @click.stop x-transition.opacity.duration.150ms x-transition:enter-start="scale-95" x-transition:enter-end="scale-100" class="absolute right-0 top-12 z-20 w-64 rounded-xl border border-slate-200 bg-white p-3 shadow-xl">
+                            <p class="mb-2 text-xs font-black uppercase tracking-widest text-slate-500">Visible columns</p>
+                            <div class="max-h-72 space-y-1 overflow-y-auto sleek-scrollbar">
+                                <template x-for="column in $store.taskColumns.columns" :key="column.key">
+                                    <label class="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-50">
+                                        <input type="checkbox" class="rounded border-slate-300 text-indigo-600" :checked="$store.taskColumns.isVisible(column.key)" @change="$store.taskColumns.toggle(column.key)">
+                                        <span x-text="column.label"></span>
+                                    </label>
+                                </template>
+                            </div>
+                            <button type="button" class="mt-3 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50" @click="$store.taskColumns.reset()">Reset columns</button>
                         </div>
-                        <button type="button" class="mt-3 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50" @click="$store.taskColumns.reset()">Reset columns</button>
                     </div>
 
-                    @if ($isKielUser)
+                    <div class="relative" x-cloak x-show="activeView === 'board'" @click.outside="showBoardColumnsMenu = false">
+                        <button type="button" class="relative inline-flex items-center rounded-xl border border-slate-200 p-2 text-slate-700 transition hover:border-slate-300" title="Boards" @click.stop="toggleBoardColumnsMenu" :aria-expanded="showBoardColumnsMenu.toString()">
+                            <span class="sr-only">Boards</span><svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M3 4h14v12H3V4Zm1 1v10h3V5H4Zm4 0v10h4V5H8Zm5 0v10h3V5h-3Z"/></svg>
+                            <span x-show="$store.kanbanColumns.hiddenCount() > 0" class="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-indigo-500"></span>
+                        </button>
+                        <div x-cloak x-show="showBoardColumnsMenu && activeView === 'board'" @click.stop x-transition.opacity.duration.150ms x-transition:enter-start="scale-95" x-transition:enter-end="scale-100" class="absolute right-0 top-12 z-20 w-64 rounded-xl border border-slate-200 bg-white p-3 shadow-xl">
+                            <p class="mb-2 text-xs font-black uppercase tracking-widest text-slate-500">Visible boards</p>
+                            <div class="max-h-72 space-y-1 overflow-y-auto sleek-scrollbar">
+                                <template x-for="column in $store.kanbanColumns.columns" :key="column.key">
+                                    <label class="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-50">
+                                        <input type="checkbox" class="rounded border-slate-300 text-indigo-600" :checked="$store.kanbanColumns.isVisible(column.key)" @change="toggleBoardColumn(column.key)">
+                                        <span x-text="column.label"></span>
+                                    </label>
+                                </template>
+                            </div>
+                            <button type="button" class="mt-3 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50" @click="resetBoardColumns()">Reset boards</button>
+                        </div>
+                    </div>
+
+@if ($isKielUser)
                         <a href="{{ route('tickets.create') }}" class="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-black text-white">Create Ticket</a>
                     @endif
                 </div>
@@ -71,6 +92,6 @@
     </div>
 
 <script>
-function taskWorkspace(config){return{activeView:config.initialView||'list',showFilters:config.initialFiltersOpen??false,showColumnsMenu:false,views:[{ key:'list',label:'List',icon:'<svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M3 5h14v2H3V5zm0 4h14v2H3V9zm0 4h14v2H3v-2z"/></svg>'},{ key:'board',label:'Board',icon:'<svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M3 4h4v12H3V4zm5 0h4v12H8V4zm5 0h4v12h-4V4z"/></svg>'},{ key:'timeline',label:'Timeline',icon:'<svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M4 4h12v2H4V4zm0 4h6v2H4V8zm8 0h4v2h-4V8zM4 12h4v2H4v-2zm6 0h6v2h-6v-2z"/></svg>'}],init(){const saved=localStorage.getItem('kiel.tasks.filters.open');this.showFilters=saved==='1';this.$store.taskColumns.init();this.$nextTick(()=>this.initView());},initView(){if(this.activeView==='board')window.KielKanban?.initAll?.();if(this.activeView==='timeline')window.KielTimeline?.initAll?.();if(this.activeView!=='list')this.showColumnsMenu=false;},toggleFilters(){this.showFilters=!this.showFilters;localStorage.setItem('kiel.tasks.filters.open',this.showFilters?'1':'0');},toggleColumnsMenu(){this.showColumnsMenu=!this.showColumnsMenu;},setView(view){this.activeView=view;const url=new URL(window.location);url.searchParams.set('view',view);window.history.pushState({},'',url);this.$nextTick(()=>this.initView());}}}
+function taskWorkspace(config){return{activeView:config.initialView||'list',showFilters:config.initialFiltersOpen??false,showListColumnsMenu:false,showBoardColumnsMenu:false,views:[{ key:'list',label:'List',icon:'<svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M3 5h14v2H3V5zm0 4h14v2H3V9zm0 4h14v2H3v-2z"/></svg>'},{ key:'board',label:'Board',icon:'<svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M3 4h4v12H3V4zm5 0h4v12H8V4zm5 0h4v12h-4V4z"/></svg>'},{ key:'timeline',label:'Timeline',icon:'<svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M4 4h12v2H4V4zm0 4h6v2H4V8zm8 0h4v2h-4V8zM4 12h4v2H4v-2zm6 0h6v2h-6v-2z"/></svg>'}],init(){const saved=localStorage.getItem('kiel.tasks.filters.open');this.showFilters=saved==='1';this.$store.taskColumns.init();this.$store.kanbanColumns.init(config.boardColumns || []);this.$nextTick(()=>this.initView());},initView(){if(this.activeView==='board')window.KielKanban?.initAll?.();if(this.activeView==='timeline')window.KielTimeline?.initAll?.();if(this.activeView!=='list')this.showListColumnsMenu=false;if(this.activeView!=='board')this.showBoardColumnsMenu=false;},toggleFilters(){this.showFilters=!this.showFilters;localStorage.setItem('kiel.tasks.filters.open',this.showFilters?'1':'0');},toggleListColumnsMenu(){this.showListColumnsMenu=!this.showListColumnsMenu; if(this.showListColumnsMenu){this.showBoardColumnsMenu=false;}},toggleBoardColumnsMenu(){this.showBoardColumnsMenu=!this.showBoardColumnsMenu; if(this.showBoardColumnsMenu){this.showListColumnsMenu=false; this.$nextTick(()=>window.KielKanban?.initAll?.(true));}},toggleBoardColumn(key){this.$store.kanbanColumns.toggle(key);this.$nextTick(()=>window.KielKanban?.initAll?.(true));},resetBoardColumns(){this.$store.kanbanColumns.reset();this.$nextTick(()=>window.KielKanban?.initAll?.(true));},setView(view){this.activeView=view;this.showListColumnsMenu=false;this.showBoardColumnsMenu=false;const url=new URL(window.location);url.searchParams.set('view',view);window.history.pushState({},'',url);this.$nextTick(()=>this.initView());}}}
 </script>
 </x-app-layout>

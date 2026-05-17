@@ -17,15 +17,6 @@
     data-current-column="{{ $columnKey }}"
     data-move-url="{{ route('kanban.tickets.move', $ticket) }}"
     data-show-url="{{ route('tickets.show', $ticket) }}"
-    data-ticket-no="{{ $ticket->ticket_no }}"
-    data-title="{{ $ticket->title }}"
-    data-urgency="{{ $ticket->formattedUrgency() }}"
-    data-assignee="{{ $ticket->assignee?->name ?? 'Unassigned' }}"
-    data-due="{{ $ticket->due_date?->format('M j, Y') ?? 'Not set' }}"
-    data-status="{{ $ticket->formattedStatus() }}"
-    data-status-label="{{ $ticket->formattedStatus() }}"
-    data-client="{{ $ticket->client?->name ?? 'No client' }}"
-    data-software="{{ $ticket->software?->name ?? 'No software' }}"
     @class([
         'kanban-card rounded-2xl border bg-white p-4 shadow-sm hover:-translate-y-0.5 hover:border-indigo-100 hover:shadow-soft',
         'border-slate-200' => ! $isOverdue && ! $ticket->isBlocked() && $ticket->urgency !== 'critical',
@@ -34,22 +25,12 @@
         'kanban-card-critical' => $ticket->urgency === 'critical',
     ])
 >
-    <button type="button" data-open-ticket data-ticket-drawer-url="{{ route('tickets.drawer', $ticket) }}" class="block w-full text-left">
-        <div class="flex items-start justify-between gap-3">
+    <div data-kanban-drag-handle class="-mx-1 mb-2 cursor-grab rounded-lg px-1 py-1 text-[11px] font-black uppercase tracking-[0.2em] text-slate-400">Drag</div>
+    <div class="flex items-start justify-between gap-3">
+        <button type="button" data-open-ticket data-ticket-drawer-url="{{ route('tickets.drawer', $ticket) }}" class="text-left">
             <span class="font-black text-indigo-700">{{ $ticket->ticket_no }}</span>
-            <span @class(['badge', 'badge-urgency-critical' => $ticket->urgency === 'critical', 'badge-urgency-high' => $ticket->urgency === 'high', 'badge-urgency-medium' => $ticket->urgency === 'medium', 'badge-urgency-low' => $ticket->urgency === 'low'])>{{ $ticket->formattedUrgency() }}</span>
-        </div>
-        <h4 class="mt-3 text-sm font-black leading-5 text-slate-950">{{ $ticket->title }}</h4>
-        <div class="mt-4 space-y-2 border-t border-slate-100 pt-3 text-xs font-semibold text-slate-500">
-            <p>Assignee: <span class="text-slate-700">{{ $ticket->assignee?->name ?? 'Unassigned' }}</span></p>
-            <p>Due: <span @class(['text-slate-700', 'font-black text-rose-700' => $isOverdue])>{{ $ticket->due_date?->format('M j, Y') ?? 'Not set' }}</span></p>
-            <p>Client: <span class="text-slate-700">{{ $ticket->client?->name ?? 'No client' }}</span></p>
-            <p>Software: <span class="text-slate-700">{{ $ticket->software?->name ?? 'No software' }}</span></p>
-        </div>
-        <div class="mt-4 flex flex-wrap items-center gap-2">
-            <span data-card-status class="badge badge-status">{{ $ticket->formattedStatus() }}</span>
-            <span data-blocked-badge @class(['badge badge-blocked', 'hidden' => ! $ticket->isBlocked()])>Blocked</span>
-            <span @class(['badge badge-overdue', 'hidden' => ! $isOverdue])>Overdue</span>
-        </div>
-    </button>
+            <h4 class="mt-2 text-sm font-black leading-5 text-slate-950">{{ $ticket->title }}</h4>
+        </button>
+        <span @class(['badge', 'badge-urgency-critical' => $ticket->urgency === 'critical', 'badge-urgency-high' => $ticket->urgency === 'high', 'badge-urgency-medium' => $ticket->urgency === 'medium', 'badge-urgency-low' => $ticket->urgency === 'low'])>{{ $ticket->formattedUrgency() }}</span>
+    </div>
 </article>
