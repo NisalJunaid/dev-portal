@@ -11,10 +11,10 @@
 
 <div x-data="timelineView({ dataUrl: @js(route('timeline.data')), dateUrlTemplate: @js(route('timeline.tasks.dates', ['ticket' => '__TICKET__'])), dependencyUrlTemplate: @js(route('timeline.tasks.dependency', ['ticket' => '__TICKET__'])), drawerUrlTemplate: @js(route('tickets.drawer', ['ticket' => '__TICKET__'])), canEdit: @js($canEdit) })" x-init="init()" class="h-full min-h-0" data-timeline-view>
 <section class="asana-panel relative flex h-full min-h-0 flex-col overflow-hidden rounded-none" data-timeline-chart-area>
-<div class="mb-4 flex items-center justify-between gap-3"><h3 class="text-lg font-black text-slate-950">Scheduled tasks</h3><p class="text-sm text-slate-500"><span x-text="tasks.length"></span> tasks</p></div>
+<div class="mb-3 flex items-center justify-end"><p class="text-sm text-slate-500"><span x-text="tasks.length"></span> tasks</p></div>
 <div x-show="loading" x-transition.opacity class="absolute inset-0 z-10 flex items-center justify-center bg-white/75"><p class="text-sm font-black text-slate-700">Loading timeline…</p></div>
-<div x-show="!loading && tasks.length===0" class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center text-sm font-bold text-slate-600">No scheduled tasks match these filters.</div>
-<div x-show="tasks.length > 0" class="flex-1 min-h-0 overflow-auto border border-slate-200 bg-white sleek-scrollbar" :class="loading ? 'opacity-50' : 'opacity-100'"><div id="timeline-gantt" class="h-full min-h-[34rem] min-w-[960px] p-4" data-timeline-chart></div></div>
+<div x-show="!loading && tasks.length===0" class="flex-1 min-h-0 flex items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center text-sm font-bold text-slate-600">No scheduled tasks match these filters.</div>
+<div x-show="tasks.length > 0" class="flex-1 min-h-0 overflow-auto border border-slate-200 bg-white sleek-scrollbar" :class="loading ? 'opacity-50' : 'opacity-100'"><div id="timeline-gantt" class="h-full min-h-[40rem] min-w-[960px] p-4" data-timeline-chart></div></div>
 </section>
 </div>
 <script>
