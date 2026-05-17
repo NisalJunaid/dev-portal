@@ -61,6 +61,7 @@ class TaskWorkspaceController extends Controller
 
         $tickets = Ticket::query()->visibleTo($request->user())->with(['client', 'software', 'submitter', 'assignee', 'sprints'])->withExists(['activeBlock as is_blocked'])
             ->when($validated['search'] ?? null, fn ($q, string $search) => $q->where(fn ($q) => $q->where('ticket_no', 'like', '%'.$search.'%')->orWhere('title', 'like', '%'.$search.'%')))
+            ->whereIn('type', [Ticket::TYPE_TASK, Ticket::TYPE_BUG])
             ->when($validated['type'] ?? null, fn ($q, string $type) => $q->where('type', $type))
             ->when($validated['urgency'] ?? null, fn ($q, string $urgency) => $q->where('urgency', $urgency))
             ->when($validated['status'] ?? null, fn ($q, string $status) => $q->where('status', $status))
@@ -71,15 +72,34 @@ class TaskWorkspaceController extends Controller
             ->orderBy('tickets.'.$sort, $direction)
             ->paginate($validated['per_page'] ?? 25)->withQueryString();
 
+
+        $currentSprint = Sprint::query()->with('client')->where('status', Sprint::STATUS_IN_PROGRESS)
+            ->when(($validated['client_id'] ?? null) && $request->user()->isKielUser(), fn ($q, $cid) => $q->where('client_id', $cid))
+            ->when(! $request->user()->isKielUser(), fn ($q) => $q->where('client_id', $request->user()->client_id))
+            ->latest('started_at')->first();
+
+        $activeSprints = collect();
+        if ($request->user()->isKielUser() && empty($validated['client_id'])) {
+            $activeSprints = Sprint::query()->with('client')->where('status', Sprint::STATUS_IN_PROGRESS)->latest('started_at')->get();
+        }
+
+        $currentSprintStats = null;
+        if ($currentSprint) {
+            $currentSprint->load('tickets');
+            $completed = $currentSprint->tickets->filter(fn (Ticket $ticket) => $ticket->isDone())->count();
+            $total = $currentSprint->tickets->count();
+            $currentSprintStats = ['total_tasks' => $total, 'completed_tasks' => $completed, 'incomplete_tasks' => $total - $completed, 'started_at' => $currentSprint->started_at, 'elapsed_seconds' => $currentSprint->elapsedSeconds(), 'timer_status' => $currentSprint->timer_status];
+        }
+
         return [
             'activeView' => $activeView, 'tickets' => $tickets, 'isKielUser' => $request->user()->isKielUser(),
             'teamMembers' => User::role(['super_admin', 'kiel_manager', 'developer'])->orderBy('name')->get(['id', 'name']),
             'clients' => Client::query()->when(! $request->user()->isKielUser(), fn ($q) => $q->whereKey($request->user()->client_id))->orderBy('name')->get(['id', 'name']),
             'softwares' => Software::query()->when(! $request->user()->isKielUser(), fn ($q) => $q->where('client_id', $request->user()->client_id))->orderBy('name')->get(['id', 'name']),
             'filters' => $filters, 'sort' => $sort, 'direction' => $direction, 'canEditTimeline' => $this->timelineService->canEdit($request->user()),
-            'assignees' => User::query()->orderBy('name')->get(['id', 'name']), 'urgencies' => Ticket::URGENCIES, 'statuses' => Ticket::STATUSES,
+            'assignees' => User::query()->orderBy('name')->get(['id', 'name']), 'urgencies' => Ticket::URGENCIES, 'statuses' => array_values(array_filter(Ticket::STATUSES, fn ($status) => $status !== Ticket::STATUS_FEATURE_APPROVED && $status !== Ticket::STATUS_RECOMMENDED && $status !== Ticket::STATUS_NEXT_SPRINT)),
             'sprints' => Sprint::query()->latest('id')->get(['id', 'name', 'sprint_no']), 'kanbanColumns' => $this->kanbanService->columnsFor(KanbanService::VIEW_ALL),
-            'kanbanTicketsByColumn' => $this->kanbanService->groupedTickets($request->user(), KanbanService::VIEW_ALL), 'canMove' => $request->user()->isKielUser() || $request->user()->isClientUser(),
+            'kanbanTicketsByColumn' => $this->kanbanService->groupedTickets($request->user(), KanbanService::VIEW_ALL), 'canMove' => $request->user()->isKielUser() || $request->user()->isClientUser(), 'currentSprint' => $currentSprint, 'activeSprints' => $activeSprints, 'currentSprintStats' => $currentSprintStats,
         ];
     }
 }

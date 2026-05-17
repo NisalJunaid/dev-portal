@@ -163,6 +163,25 @@ class FeatureController extends Controller
         return back()->with('status', 'Recommendation deferred.');
     }
 
+
+    public function removeFromSprint(Request $request, Ticket $ticket): JsonResponse|RedirectResponse
+    {
+        $this->authorizeKielFeatureAccess($request, $ticket);
+        abort_unless($ticket->status === Ticket::STATUS_NEXT_SPRINT, Response::HTTP_UNPROCESSABLE_ENTITY, 'Only next sprint features can be removed.');
+
+        $oldStatus = $ticket->status;
+        $newStatus = Ticket::STATUS_FEATURE_APPROVED;
+        $ticket->update(['status' => $newStatus]);
+
+        $this->ticketActivityService->log($ticket, 'removed from sprint queue', 'Feature removed from current sprint approval queue.', $request->user(), $oldStatus, $newStatus);
+
+        if ($request->expectsJson()) {
+            return response()->json(['message' => 'Feature removed from sprint queue.', 'ticket' => ['id' => $ticket->id, 'status' => $ticket->status]]);
+        }
+
+        return back()->with('status', 'Feature removed from sprint queue.');
+    }
+
     public function complete(Request $request, Ticket $ticket): JsonResponse|RedirectResponse
     {
         $this->authorizeKielFeatureAccess($request, $ticket);

@@ -18,6 +18,10 @@ class Sprint extends Model
 
     public const STATUSES = [self::STATUS_PLANNED, self::STATUS_IN_PROGRESS, self::STATUS_COMPLETED];
 
+    public const TIMER_RUNNING = 'running';
+    public const TIMER_PAUSED = 'paused';
+    public const TIMER_COMPLETED = 'completed';
+
     protected $fillable = [
         'client_id',
         'software_id',
@@ -29,12 +33,17 @@ class Sprint extends Model
         'duration_seconds',
         'started_by',
         'ended_by',
+        'timer_status',
+        'paused_at',
+        'accumulated_paused_seconds',
     ];
 
     protected $casts = [
         'started_at' => 'datetime',
         'ended_at' => 'datetime',
         'duration_seconds' => 'integer',
+        'paused_at' => 'datetime',
+        'accumulated_paused_seconds' => 'integer',
     ];
 
     public function client(): BelongsTo
@@ -93,6 +102,33 @@ class Sprint extends Model
     public function formattedStatus(): string
     {
         return str($this->status)->replace('_', ' ')->headline()->toString();
+    }
+
+
+    public function elapsedSeconds(): int
+    {
+        if (! $this->started_at) {
+            return 0;
+        }
+
+        $end = $this->ended_at ?? now();
+        $elapsed = $this->started_at->diffInSeconds($end) - ((int) $this->accumulated_paused_seconds);
+
+        if ($this->isPausedTimer() && $this->paused_at) {
+            $elapsed -= $this->paused_at->diffInSeconds(now());
+        }
+
+        return max(0, $elapsed);
+    }
+
+    public function isRunningTimer(): bool
+    {
+        return $this->timer_status === self::TIMER_RUNNING;
+    }
+
+    public function isPausedTimer(): bool
+    {
+        return $this->timer_status === self::TIMER_PAUSED;
     }
 
     public function formattedDuration(): string

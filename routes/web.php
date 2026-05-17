@@ -68,12 +68,16 @@ Route::middleware('auth')->group(function () {
     Route::post('/features/{ticket}/approve-next-sprint', [FeatureController::class, 'approveNextSprint'])->name('features.approve-next-sprint');
     Route::post('/features/{ticket}/defer', [FeatureController::class, 'defer'])->name('features.defer');
     Route::post('/features/{ticket}/complete', [FeatureController::class, 'complete'])->name('features.complete');
+    Route::patch('/features/{ticket}/remove-from-sprint', [FeatureController::class, 'removeFromSprint'])->name('features.remove-from-sprint');
 
     Route::get('/sprints', [SprintController::class, 'index'])->name('sprints.index');
     Route::get('/sprints/start', [SprintController::class, 'startForm'])->name('sprints.start');
     Route::get('/sprints/{sprint}', [SprintController::class, 'show'])->name('sprints.show');
     Route::post('/sprints/start', [SprintController::class, 'start'])->name('sprints.start.store');
     Route::post('/sprints/{sprint}/complete', [SprintController::class, 'complete'])->name('sprints.complete');
+    Route::patch('/sprints/{sprint}/pause', [SprintController::class, 'pause'])->name('sprints.pause');
+    Route::patch('/sprints/{sprint}/resume', [SprintController::class, 'resume'])->name('sprints.resume');
+    Route::patch('/sprints/{sprint}/end', [SprintController::class, 'end'])->name('sprints.end');
 
     Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
     Route::get('/reports/time', [ReportController::class, 'time'])->name('reports.time');
