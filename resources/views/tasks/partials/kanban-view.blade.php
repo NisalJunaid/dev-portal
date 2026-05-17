@@ -8,7 +8,7 @@
     <div class="grid h-full min-h-0 auto-cols-[minmax(18rem,20rem)] grid-flow-col gap-4 overflow-x-auto pb-4 sm:auto-cols-[20rem] lg:gap-5 sleek-scrollbar">
         @foreach ($columns as $columnKey => $label)
             @php($columnTickets = $ticketsByColumn[$columnKey] ?? collect())
-            <div class="flex h-full min-h-0 w-full flex-col border border-slate-200 bg-slate-100/80 p-4">
+            <div x-show="$store.kanbanColumns.isVisible('{{$columnKey}}')" x-transition.opacity.duration.150ms class="flex h-full min-h-0 w-full flex-col border border-slate-200 bg-slate-100/80 p-4">
                 <div class="mb-4 flex items-start justify-between gap-3">
                     <div>
                         <h3 class="text-sm font-black uppercase tracking-[0.2em] text-slate-700">{{ $label }}</h3>

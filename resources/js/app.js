@@ -222,6 +222,26 @@ Alpine.store('taskColumns', {
     startResize(event,key){ const c=this.columns.find((x)=>x.key===key); if(!c) return; const startX=event.clientX,startW=this.width(key); document.body.classList.add('is-column-resizing'); const move=(e)=>{ const next=Math.max(c.min, Math.min(startW+(e.clientX-startX), c.max||600)); this.widths[key]=Math.round(next); }; const up=()=>{ document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up); document.body.classList.remove('is-column-resizing'); localStorage.setItem('kiel.tasks.list.columns.widths', JSON.stringify(this.widths)); }; document.addEventListener('mousemove', move); document.addEventListener('mouseup', up); },
 });
 
+
+Alpine.store('kanbanColumns', {
+    columns: [], visible: {}, initialized: false,
+    init(columns = []) {
+        const normalized = Array.isArray(columns) ? columns : [];
+        const saved = JSON.parse(localStorage.getItem('kiel.tasks.board.columns.visible') || '{}');
+        this.columns = normalized;
+        const nextVisible = {};
+        this.columns.forEach((column) => {
+            nextVisible[column.key] = saved[column.key] !== false;
+        });
+        this.visible = nextVisible;
+        this.initialized = true;
+    },
+    isVisible(key) { return this.visible[key] !== false; },
+    toggle(key) { this.visible[key] = !this.isVisible(key); localStorage.setItem('kiel.tasks.board.columns.visible', JSON.stringify(this.visible)); },
+    reset() { this.columns.forEach((column) => { this.visible[column.key] = true; }); localStorage.setItem('kiel.tasks.board.columns.visible', JSON.stringify(this.visible)); },
+    hiddenCount() { return this.columns.filter((column) => !this.isVisible(column.key)).length; },
+});
+
 Alpine.start();
 
 const loadSortable = () => {
@@ -246,29 +266,46 @@ const updateKanbanEmptyStates = (board) => board.querySelectorAll('[data-kanban-
 });
 
 window.KielKanban = {
-    async initAll() {
+    async initAll(force = false) {
         await loadSortable().catch(() => window.Kiel.toast('Kanban library failed to load.', 'error'));
         document.querySelectorAll('[data-kanban-board]').forEach((board) => {
-            if (board.dataset.kanbanInitialized === '1' || board.dataset.canMove !== 'true' || !window.Sortable) return;
-            board.dataset.kanbanInitialized = '1';
+            if (board.dataset.canMove !== 'true' || !window.Sortable) return;
+            const visible = window.getComputedStyle(board).display !== 'none';
+            if (!visible) return;
+            let initializedAny = false;
             board.querySelectorAll('[data-kanban-column]').forEach((column) => {
+                if (!force && column.dataset.sortableInitialized === '1') return;
                 window.Sortable.create(column, {
-                    group: 'kiel-kanban', animation: 150, draggable: '[data-kanban-card]', ghostClass: 'opacity-60', chosenClass: 'ring-2 ring-indigo-300',
+                    group: `kiel-kanban-${board.dataset.view || 'all'}`, animation: 150, draggable: '[data-kanban-card]', handle: '[data-kanban-drag-handle]', ghostClass: 'opacity-60', chosenClass: 'ring-2 ring-indigo-300',
                     onEnd: async (evt) => {
                         const card = evt.item; const boardView = board.dataset.view || 'all';
-                        const ticketId = card.dataset.ticketId; const status = evt.to.dataset.column;
-                        const ordered = Array.from(evt.to.querySelectorAll('[data-kanban-card]')).map((el) => Number(el.dataset.ticketId));
+                        const ticketId = card.dataset.ticketId;
+                        const oldColumn = evt.from;
+                        const newColumn = evt.to;
+                        const column = newColumn.dataset.column;
+                        const ordered = Array.from(newColumn.querySelectorAll('[data-kanban-card]')).map((el) => Number(el.dataset.ticketId));
+                        const sourceOrdered = Array.from(oldColumn.querySelectorAll('[data-kanban-card]')).map((el) => Number(el.dataset.ticketId));
+                        const movedAcross = oldColumn !== newColumn;
                         try {
-                            await window.Kiel.request(card.dataset.moveUrl, { method: 'PATCH', body: JSON.stringify({ status, position: evt.newIndex, view: boardView }) });
-                            await window.Kiel.request(board.dataset.reorderUrl, { method: 'PATCH', body: JSON.stringify({ status, ticket_ids: ordered, view: boardView }) });
-                            updateKanbanEmptyStates(board); window.Kiel.toast(`Ticket #${ticketId} moved.`, 'success');
+                            if (movedAcross) {
+                                await window.Kiel.request(card.dataset.moveUrl, { method: 'PATCH', body: JSON.stringify({ column, position: evt.newIndex, view: boardView }) });
+                            }
+                            await window.Kiel.request(board.dataset.reorderUrl, { method: 'PATCH', body: JSON.stringify({ column, tickets: ordered, view: boardView }) });
+                            if (movedAcross && sourceOrdered.length) {
+                                await window.Kiel.request(board.dataset.reorderUrl, { method: 'PATCH', body: JSON.stringify({ column: oldColumn.dataset.column, tickets: sourceOrdered, view: boardView }) });
+                            }
+                            card.dataset.currentColumn = column;
+                            updateKanbanEmptyStates(board); window.Kiel.toast(`Task moved.`, 'success');
                         } catch (error) {
                             window.Kiel.toast(error.message || 'Unable to move ticket.', 'error');
                             window.location.reload();
                         }
                     },
                 });
+                column.dataset.sortableInitialized = '1';
+                initializedAny = true;
             });
+            if (initializedAny) board.dataset.kanbanInitialized = '1';
             updateKanbanEmptyStates(board);
         });
     },

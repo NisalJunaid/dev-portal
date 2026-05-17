@@ -216,3 +216,36 @@ Production hardening and deployment preparation.
 
 ### Next planned task
 Production hardening and deployment preparation.
+
+## Completed: Tasks workspace controls + interactions hardening
+
+### Summary
+- Fixed the List view columns dropdown so it no longer closes immediately after opening.
+- Added a Board view “Boards” visibility menu with localStorage persistence (`kiel.tasks.board.columns.visible`).
+- Fixed Kanban drag/drop integration to align frontend payloads with backend expectations (`column`, `tickets`) and improved Sortable initialization reliability for hidden/shown views.
+- Refactored Kanban cards to use a dedicated drag handle and avoid full-card button wrapping that can block dragging.
+- Updated timeline task labels to use task title only (no assignee/status/urgency metadata in bar label text).
+- Added timeline cursor/drag affordance styling for bars and resize handles.
+- Vertical timeline movement: current Frappe Gantt integration supports horizontal date drag/resize; native vertical row drag/reorder is not currently implemented in this pass to avoid introducing unstable custom behavior.
+
+### Files changed
+- `resources/views/tasks/index.blade.php`
+- `resources/views/tasks/partials/kanban-view.blade.php`
+- `resources/views/kanban/partials/card.blade.php`
+- `resources/js/app.js`
+- `resources/css/app.css`
+- `app/Services/TimelineService.php`
+- `docs/IMPLEMENTATION_TRACKER.md`
+
+### Tests/checks run
+- `php artisan view:clear` *(failed: missing `vendor/autoload.php` in container)*
+- `php artisan optimize:clear` *(failed: missing `vendor/autoload.php` in container)*
+- `php artisan route:list` *(failed: missing `vendor/autoload.php` in container)*
+- `php artisan test` *(failed: missing `vendor/autoload.php` in container)*
+
+### Known remaining issues
+- Composer vendor dependencies are still unavailable in this container, so artisan/test execution cannot complete here.
+- Timeline vertical row reordering remains a known gap in the current Frappe Gantt-based implementation.
+
+### Next planned task
+Production hardening and deployment preparation.

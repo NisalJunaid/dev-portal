@@ -136,14 +136,6 @@ class TimelineService
             && $ticket->due_date->lt(today())
             && ! in_array($ticket->status, [Ticket::STATUS_BUG_COMPLETED, Ticket::STATUS_FEATURE_COMPLETED], true);
 
-        $metadata = collect([
-            $ticket->assignee?->name ?? 'Unassigned',
-            $ticket->formattedStatus(),
-            $ticket->formattedUrgency(),
-            ($ticket->isBlocked() || $ticket->activeBlock) ? 'Blocked' : null,
-            $isOverdue ? 'Overdue' : null,
-        ])->filter()->join(' · ');
-
         $timelineClass = 'timeline-urgency-'.$ticket->urgency;
 
         if ($ticket->isBlocked() || $ticket->activeBlock) {
@@ -154,7 +146,7 @@ class TimelineService
 
         return [
             'id' => (string) $ticket->id,
-            'name' => trim($ticket->ticket_no.' · '.$ticket->title.' — '.$metadata),
+            'name' => $ticket->title,
             'start' => $ticket->start_date?->toDateString(),
             'end' => $ticket->due_date?->toDateString(),
             'progress' => in_array($ticket->status, [Ticket::STATUS_BUG_COMPLETED, Ticket::STATUS_FEATURE_COMPLETED], true) ? 100 : 0,
