@@ -347,3 +347,36 @@ Production hardening and deployment preparation.
 - fix applied: updated migration to add `source_feature_id`, `generated_from_sprint_id`, and `is_generated_task` columns first using `foreignId()->nullable()->constrained(...)->nullOnDelete()` (for the two FK columns), wrapped each add/drop in `Schema::hasColumn` guards for partial-failure safety, and implemented safe `down()` cleanup with `dropConstrainedForeignId` and `dropColumn`.
 - migration test result: attempted `php artisan migrate`, but this container failed before Laravel boot because `vendor/autoload.php` is missing; migration SQL path is fixed in code and ready to run once dependencies are installed.
 - next planned task unchanged: Production hardening and deployment preparation.
+
+## Completed: Feature request/task hierarchy foundations + drawer UX
+
+### Summary
+- added Ticket parent/children/subFeatures/subtasks relationships and helper methods for task/subtask and feature/sub-feature detection.
+- added AJAX feature-request creation endpoint (`features.request.store`) supporting client and Kiel users with client/software access validation and optional parent feature assignment.
+- expanded task creation (`TicketController@store`) to support explicit task creation (`type=task`), optional parent task linkage, and JSON responses for drawer submissions.
+- added Tasks toolbar `Feature Request` button + new create-feature drawer partial using no-reload submissions.
+- added ticket drawer “Sub-items” section with child hierarchy list, open-child behavior, and quick action buttons for add sub-feature/add subtask.
+- added JSON response support for feature sprint actions (`approve-next-sprint`, `defer`, `complete`) for drawer/AJAX workflows.
+
+### Files changed
+- `app/Models/Ticket.php`
+- `app/Http/Controllers/FeatureController.php`
+- `app/Http/Controllers/TicketController.php`
+- `routes/web.php`
+- `resources/views/tasks/index.blade.php`
+- `resources/views/tasks/partials/create-feature-drawer.blade.php`
+- `resources/views/tickets/partials/drawer.blade.php`
+- `resources/views/tickets/partials/drawer-content.blade.php`
+- `docs/IMPLEMENTATION_TRACKER.md`
+
+### Tests/checks run
+- `php artisan view:clear`
+- `php artisan optimize:clear`
+- `php artisan route:list`
+- `php artisan test`
+
+### Known issues
+- environment still may fail artisan/test commands if Composer vendor dependencies are unavailable.
+
+### Next planned task
+Production hardening and deployment preparation.

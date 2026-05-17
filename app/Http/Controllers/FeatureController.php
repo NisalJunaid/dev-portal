@@ -123,7 +123,7 @@ class FeatureController extends Controller
         return back()->with('status', 'Feature recommended for the next planning cycle.');
     }
 
-    public function approveNextSprint(Request $request, Ticket $ticket): RedirectResponse
+    public function approveNextSprint(Request $request, Ticket $ticket): JsonResponse|RedirectResponse
     {
         $this->authorizeKielFeatureAccess($request, $ticket);
         abort_unless(in_array($ticket->status, [Ticket::STATUS_FEATURE_APPROVED, Ticket::STATUS_RECOMMENDED], true), Response::HTTP_UNPROCESSABLE_ENTITY, 'Only approved or recommended features can move to the next sprint.');
@@ -134,10 +134,12 @@ class FeatureController extends Controller
 
         $this->ticketActivityService->log($ticket, 'moved to next sprint', 'Feature moved into the next sprint planning queue.', $request->user(), $oldStatus, Ticket::STATUS_NEXT_SPRINT);
 
+        if ($request->expectsJson()) { return response()->json(['message' => 'Feature moved to the next sprint.','ticket' => ['id' => $ticket->id, 'status' => $ticket->status]]); }
+
         return back()->with('status', 'Feature moved to the next sprint.');
     }
 
-    public function defer(Request $request, Ticket $ticket): RedirectResponse
+    public function defer(Request $request, Ticket $ticket): JsonResponse|RedirectResponse
     {
         $this->authorizeKielFeatureAccess($request, $ticket);
         abort_unless($ticket->status === Ticket::STATUS_RECOMMENDED, Response::HTTP_UNPROCESSABLE_ENTITY, 'Only recommended features can be deferred.');
@@ -156,10 +158,12 @@ class FeatureController extends Controller
 
         $this->ticketActivityService->log($ticket, 'deferred', $description, $request->user(), $oldStatus, Ticket::STATUS_FEATURE_APPROVED);
 
+        if ($request->expectsJson()) { return response()->json(['message' => 'Recommendation deferred.','ticket' => ['id' => $ticket->id, 'status' => $ticket->status]]); }
+
         return back()->with('status', 'Recommendation deferred.');
     }
 
-    public function complete(Request $request, Ticket $ticket): RedirectResponse
+    public function complete(Request $request, Ticket $ticket): JsonResponse|RedirectResponse
     {
         $this->authorizeKielFeatureAccess($request, $ticket);
         abort_if($ticket->isBlocked(), Response::HTTP_UNPROCESSABLE_ENTITY, 'Use the Unblock button and provide a note before completing blocked features.');
@@ -174,7 +178,74 @@ class FeatureController extends Controller
 
         $this->ticketActivityService->log($ticket, 'completed', 'Feature marked completed with completion timestamps.', $request->user(), $oldStatus, Ticket::STATUS_FEATURE_COMPLETED);
 
+        if ($request->expectsJson()) { return response()->json(['message' => 'Feature marked completed.','ticket' => ['id' => $ticket->id, 'status' => $ticket->status]]); }
+
         return back()->with('status', 'Feature marked completed.');
+    }
+
+    public function storeRequest(Request $request): JsonResponse
+    {
+        abort_unless($request->user()->can('view features') || $request->user()->can('view tickets'), Response::HTTP_FORBIDDEN);
+
+        $isKielUser = $request->user()->isKielUser();
+
+        $validated = $request->validate([
+            'title' => ['required', 'string', 'max:255'],
+            'description' => ['required', 'string', 'max:10000'],
+            'software_id' => ['required', Rule::exists('softwares', 'id')->where('is_enabled', true)],
+            'urgency' => ['required', Rule::in(Ticket::URGENCIES)],
+            'parent_ticket_id' => ['nullable', Rule::exists('tickets', 'id')],
+            'status' => ['nullable', Rule::in([Ticket::STATUS_FEATURE_APPROVED, Ticket::STATUS_RECOMMENDED, Ticket::STATUS_NEXT_SPRINT])],
+            'start_date' => ['nullable', 'date'],
+            'due_date' => ['nullable', 'date', 'after_or_equal:start_date'],
+            'estimated_hours' => ['nullable', 'numeric', 'min:0', 'max:999999.99'],
+            'assigned_to' => ['nullable', Rule::exists('users', 'id')],
+        ]);
+
+        $software = Software::with('client')->findOrFail($validated['software_id']);
+        abort_unless($request->user()->canAccessClient($software->client), Response::HTTP_FORBIDDEN);
+
+        $parent = null;
+        if (! empty($validated['parent_ticket_id'])) {
+            $parent = Ticket::query()->where('type', Ticket::TYPE_FEATURE)->findOrFail($validated['parent_ticket_id']);
+            abort_unless($parent->client_id === $software->client_id && $parent->software_id === $software->id, Response::HTTP_UNPROCESSABLE_ENTITY, 'Parent feature must match client/software.');
+            abort_unless($request->user()->isKielUser() || $parent->client_id === $request->user()->client_id, Response::HTTP_FORBIDDEN);
+        }
+
+        $status = Ticket::STATUS_FEATURE_APPROVED;
+        if ($isKielUser && ! empty($validated['status'])) {
+            $status = $validated['status'];
+        }
+
+        $ticket = DB::transaction(function () use ($validated, $software, $request, $isKielUser, $status) {
+            $ticket = Ticket::create([
+                'client_id' => $software->client_id,
+                'software_id' => $software->id,
+                'submitted_by' => $request->user()->id,
+                'assigned_to' => $isKielUser ? ($validated['assigned_to'] ?? null) : null,
+                'ticket_no' => app(\App\Services\TicketNumberService::class)->next(),
+                'title' => $validated['title'],
+                'description' => $validated['description'],
+                'urgency' => $validated['urgency'],
+                'type' => Ticket::TYPE_FEATURE,
+                'status' => $status,
+                'parent_ticket_id' => $validated['parent_ticket_id'] ?? null,
+                'submitted_at' => now(),
+                'start_date' => $isKielUser ? ($validated['start_date'] ?? null) : null,
+                'due_date' => $isKielUser ? ($validated['due_date'] ?? null) : null,
+                'estimated_hours' => $isKielUser ? ($validated['estimated_hours'] ?? null) : null,
+            ]);
+            return $ticket;
+        });
+
+        $message = ! empty($validated['parent_ticket_id']) ? 'Sub-feature request created.' : 'Feature request created.';
+        $this->ticketActivityService->log($ticket, 'created feature request', $message, $request->user());
+
+        return response()->json([
+            'message' => $message,
+            'ticket' => ['id' => $ticket->id, 'ticket_no' => $ticket->ticket_no, 'title' => $ticket->title, 'status' => $ticket->status],
+            'drawer_url' => route('tickets.drawer', $ticket),
+        ], 201);
     }
 
     public function update(Request $request, Ticket $ticket): RedirectResponse

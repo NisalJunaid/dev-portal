@@ -111,6 +111,26 @@ class Ticket extends Model
         return $this->belongsTo(self::class, 'parent_ticket_id');
     }
 
+    public function parent(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'parent_ticket_id');
+    }
+
+    public function children(): HasMany
+    {
+        return $this->hasMany(self::class, 'parent_ticket_id')->orderBy('priority_order')->orderBy('id');
+    }
+
+    public function subFeatures(): HasMany
+    {
+        return $this->children()->where('type', self::TYPE_FEATURE);
+    }
+
+    public function subtasks(): HasMany
+    {
+        return $this->children()->where('type', self::TYPE_TASK);
+    }
+
     public function dependency(): BelongsTo
     {
         return $this->belongsTo(self::class, 'depends_on_ticket_id');
@@ -199,6 +219,26 @@ class Ticket extends Model
     public function isCompletedFeature(): bool
     {
         return $this->status === self::STATUS_FEATURE_COMPLETED;
+    }
+
+    public function isTask(): bool
+    {
+        return $this->type === self::TYPE_TASK || $this->is_generated_task;
+    }
+
+    public function isParentFeature(): bool
+    {
+        return $this->isFeature() && $this->parent_ticket_id === null;
+    }
+
+    public function isSubFeature(): bool
+    {
+        return $this->isFeature() && $this->parent_ticket_id !== null;
+    }
+
+    public function isSubtask(): bool
+    {
+        return $this->isTask() && $this->parent_ticket_id !== null;
     }
 
     public function isBlocked(): bool
