@@ -55,7 +55,8 @@ Production hardening and deployment preparation.
 
 ## Issue: Ticket drawer Blade parse failure
 
-- issue: `resources/views/tickets/partials/drawer.blade.php` had an unsafe/miscompiled top-level `@if/@else` structure.
-- fix: replaced it with two independent top-level `@if` blocks (`@if ($mode === 'content') ... @endif` and `@if ($mode !== 'content') ... @endif`).
-- verification: attempted `php artisan view:clear` and `php artisan optimize:clear` (blocked in this container because `vendor/autoload.php` is missing), and attempted to load `/tickets` at `http://localhost:8000/tickets` (no local server listening).
+- exact file fixed: `resources/views/tickets/partials/drawer.blade.php`.
+- exact directive mismatch found: prior revisions had a top-level mode switch that alternated between a shared `@else` branch and extra/shifted closing directives, causing compiled output to intermittently fail with `unexpected token "else"` or `unexpected token "endif"`.
+- fix applied: retained the safe two-block top-level structure only (`@if ($mode === 'content') ... @endif` then `@if ($mode !== 'content') ... @endif`), with no top-level `@else` and no `@unless` in this file.
+- verification result: top-level directive balance in `drawer.blade.php` is correct (content opens/closes once and shell opens/closes once); included partials `resources/views/tickets/partials/comments.blade.php` and `resources/views/tickets/partials/activity-timeline.blade.php` already use valid `@forelse/@empty/@endforelse`; `php artisan view:clear` and `php artisan optimize:clear` cannot run in this container because `vendor/autoload.php` is missing; local `/tickets` reload could not be executed here.
 - next planned task unchanged: Production hardening and deployment preparation.
