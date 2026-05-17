@@ -54,29 +54,7 @@
                 @endforeach
             </div>
 
-            <aside data-ticket-drawer class="fixed inset-y-0 right-0 z-50 hidden w-full max-w-xl border-l border-slate-200 bg-white shadow-2xl">
-                <div class="flex h-full flex-col">
-                    <div class="flex items-center justify-between border-b border-slate-200 px-6 py-5">
-                        <div>
-                            <p data-drawer-ticket-no class="text-sm font-black uppercase tracking-[0.2em] text-indigo-600"></p>
-                            <h3 data-drawer-title class="mt-2 text-2xl font-black text-slate-950"></h3>
-                        </div>
-                        <button type="button" data-drawer-close class="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-black text-slate-600">Close</button>
-                    </div>
-                    <div class="space-y-4 overflow-y-auto p-6 text-sm">
-                        <dl class="grid grid-cols-2 gap-3">
-                            <div class="rounded-2xl bg-slate-50 p-4"><dt class="font-black text-slate-400">Urgency</dt><dd data-drawer-urgency class="mt-1 font-bold text-slate-800"></dd></div>
-                            <div class="rounded-2xl bg-slate-50 p-4"><dt class="font-black text-slate-400">Assignee</dt><dd data-drawer-assignee class="mt-1 font-bold text-slate-800"></dd></div>
-                            <div class="rounded-2xl bg-slate-50 p-4"><dt class="font-black text-slate-400">Due date</dt><dd data-drawer-due class="mt-1 font-bold text-slate-800"></dd></div>
-                            <div class="rounded-2xl bg-slate-50 p-4"><dt class="font-black text-slate-400">Status</dt><dd data-drawer-status class="mt-1 font-bold text-slate-800"></dd></div>
-                            <div class="rounded-2xl bg-slate-50 p-4"><dt class="font-black text-slate-400">Client</dt><dd data-drawer-client class="mt-1 font-bold text-slate-800"></dd></div>
-                            <div class="rounded-2xl bg-slate-50 p-4"><dt class="font-black text-slate-400">Software</dt><dd data-drawer-software class="mt-1 font-bold text-slate-800"></dd></div>
-                        </dl>
-                        <a data-drawer-link href="#" class="inline-flex rounded-2xl bg-indigo-600 px-5 py-3 text-sm font-black text-white shadow-soft">Open full ticket</a>
-                    </div>
-                </div>
-            </aside>
-            <div data-drawer-backdrop class="fixed inset-0 z-40 hidden bg-slate-950/30"></div>
+            @include('tickets.partials.drawer')
         </section>
     </div>
 
@@ -188,26 +166,12 @@
                 });
             };
 
-            const drawer = board.querySelector('[data-ticket-drawer]');
-            const backdrop = board.querySelector('[data-drawer-backdrop]');
-            const closeDrawer = () => { drawer.classList.add('hidden'); backdrop.classList.add('hidden'); };
-            board.querySelector('[data-drawer-close]')?.addEventListener('click', closeDrawer);
-            backdrop?.addEventListener('click', closeDrawer);
             board.addEventListener('click', (event) => {
-                if (draggedCard) {
-                    draggedCard = false;
-                    return;
-                }
-
-                const button = event.target.closest('[data-open-ticket]');
-                if (! button) return;
-                const card = button.closest('[data-kanban-card]');
-                const fields = { ticketNo: 'ticket-no', title: 'title', urgency: 'urgency', assignee: 'assignee', due: 'due', status: 'status', client: 'client', software: 'software' };
-                Object.entries(fields).forEach(([datasetKey, target]) => board.querySelector(`[data-drawer-${target}]`)?.replaceChildren(document.createTextNode(card.dataset[datasetKey] || '')));
-                board.querySelector('[data-drawer-link]').href = card.dataset.showUrl;
-                drawer.classList.remove('hidden');
-                backdrop.classList.remove('hidden');
-            });
+                if (!draggedCard) return;
+                draggedCard = false;
+                event.preventDefault();
+                event.stopPropagation();
+            }, true);
 
             initializeSortables();
             refreshAll();

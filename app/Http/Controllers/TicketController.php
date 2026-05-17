@@ -189,6 +189,41 @@ class TicketController extends Controller
         ]);
     }
 
+
+    public function drawer(Request $request, Ticket $ticket): JsonResponse
+    {
+        $this->authorizeTicketAccess($request, $ticket);
+
+        $ticket->load(['client', 'software', 'submitter', 'assignee', 'activities.user', 'activeBlock.blocker', 'sprints']);
+        $comments = $this->visibleComments($request, $ticket);
+        $currentTimer = $request->user()->isKielUser()
+            ? $this->timeTrackingService->activeTimerFor($ticket, $request->user())->latest()->first()
+            : null;
+        $cumulativeDuration = $request->user()->isKielUser()
+            ? $this->timeTrackingService->cumulativeDurationForTicket($ticket)
+            : null;
+        $activeBlock = $ticket->activeBlock;
+        $totalBlockedDuration = $this->ticketBlockService->totalBlockedDurationForTicket($ticket);
+
+        return response()->json([
+            'html' => view('tickets.partials.drawer', [
+                'mode' => 'content',
+                'ticket' => $ticket,
+                'comments' => $comments,
+                'teamMembers' => $this->teamMembers(),
+                'isKielUser' => $request->user()->isKielUser(),
+                'currentTimer' => $currentTimer,
+                'cumulativeDuration' => $cumulativeDuration,
+                'activeBlock' => $activeBlock,
+                'totalBlockedDuration' => $totalBlockedDuration,
+                'canRecommend' => ! $request->user()->isKielUser()
+                    && $ticket->isFeature()
+                    && $ticket->status === Ticket::STATUS_FEATURE_APPROVED,
+            ])->render(),
+            'ticket' => $this->inlineTicketPayload($ticket),
+        ]);
+    }
+
     public function classify(Request $request, Ticket $ticket): RedirectResponse
     {
         $this->authorizeKielTicketAccess($request, $ticket);
@@ -341,7 +376,7 @@ class TicketController extends Controller
         }
 
         $validated = $request->validate([
-            'field' => ['required', Rule::in(['title', 'urgency', 'assigned_to', 'start_date', 'due_date', 'status'])],
+            'field' => ['required', Rule::in(['title', 'description', 'urgency', 'assigned_to', 'start_date', 'due_date', 'status'])],
             'value' => ['nullable'],
         ]);
 
@@ -413,7 +448,7 @@ class TicketController extends Controller
         ]);
     }
 
-    public function comment(Request $request, Ticket $ticket): RedirectResponse
+    public function comment(Request $request, Ticket $ticket): JsonResponse|RedirectResponse
     {
         $this->authorizeTicketAccess($request, $ticket);
 
@@ -435,6 +470,22 @@ class TicketController extends Controller
 
         $this->ticketActivityService->log($ticket, 'comment added', $isInternal ? 'Internal comment added.' : 'Comment added.', $request->user());
 
+        if ($request->expectsJson()) {
+            $ticket->refresh()->load('activities.user');
+
+            return response()->json([
+                'message' => 'Comment added.',
+                'comments_html' => view('tickets.partials.comments', [
+                    'comments' => $this->visibleComments($request, $ticket),
+                    'ticket' => $ticket,
+                    'isKielUser' => $request->user()->isKielUser(),
+                ])->render(),
+                'activity_html' => view('tickets.partials.activity-timeline', [
+                    'activities' => $ticket->activities,
+                ])->render(),
+            ]);
+        }
+
         return back()->with('status', 'Comment added.');
     }
 
@@ -442,6 +493,7 @@ class TicketController extends Controller
     {
         return match ($field) {
             'title' => ['required', 'string', 'max:255'],
+            'description' => ['required', 'string', 'max:10000'],
             'urgency' => ['required', Rule::in(Ticket::URGENCIES)],
             'assigned_to' => ['nullable', Rule::exists('users', 'id')],
             'start_date' => ['nullable', 'date'],
@@ -454,6 +506,7 @@ class TicketController extends Controller
     {
         return match ($field) {
             'title' => 'title changed',
+            'description' => 'description changed',
             'urgency' => 'urgency changed',
             'assigned_to' => 'assigned',
             'start_date', 'due_date' => 'dates changed',
@@ -468,6 +521,7 @@ class TicketController extends Controller
         return [
             'id' => $ticket->id,
             'title' => $ticket->title,
+            'description' => $ticket->description,
             'urgency' => $ticket->urgency,
             'urgency_label' => $ticket->formattedUrgency(),
             'assigned_to' => $ticket->assigned_to,

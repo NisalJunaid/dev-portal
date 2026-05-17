@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Services\TicketActivityService;
 use App\Services\TicketBlockService;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -97,7 +98,7 @@ class FeatureController extends Controller
         ]);
     }
 
-    public function recommend(Request $request, Ticket $ticket): RedirectResponse
+    public function recommend(Request $request, Ticket $ticket): JsonResponse|RedirectResponse
     {
         $this->authorizeFeatureAccess($request, $ticket);
         abort_unless(in_array($ticket->status, [Ticket::STATUS_FEATURE_APPROVED], true), Response::HTTP_UNPROCESSABLE_ENTITY, 'Only approved features can be recommended.');
@@ -107,6 +108,17 @@ class FeatureController extends Controller
         $ticket->update(['status' => Ticket::STATUS_RECOMMENDED]);
 
         $this->ticketActivityService->log($ticket, 'recommended', 'Feature recommended for the next planning cycle.', $request->user(), $oldStatus, Ticket::STATUS_RECOMMENDED);
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'message' => 'Feature recommended for the next planning cycle.',
+                'ticket' => [
+                    'id' => $ticket->id,
+                    'status' => $ticket->status,
+                    'status_label' => $ticket->formattedStatus(),
+                ],
+            ]);
+        }
 
         return back()->with('status', 'Feature recommended for the next planning cycle.');
     }

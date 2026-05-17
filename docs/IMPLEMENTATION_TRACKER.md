@@ -1,76 +1,47 @@
 # Implementation Tracker
 
-## Completed: Asana-style Timeline view
+## Completed: Asana-style right-side task drawer
 
 ### Summary
-Implemented a dedicated Asana-style Timeline/Gantt planning view. DHTMLX Gantt was attempted first, but the npm registry returned `403 Forbidden`; Frappe Gantt was also unavailable through npm for the same reason, so the implementation uses the Frappe Gantt CDN fallback pattern for Laravel Blade, Alpine.js, and Tailwind.
+Implemented a unified Asana-style right-side task drawer that is available from the ticket List view, Kanban board, and Timeline view without a full page reload. The drawer loads ticket detail HTML over AJAX and reuses existing ticket inline-update, comment, timer, block/unblock, and feature recommendation endpoints instead of duplicating workflow logic.
 
-### Timeline view
-- Added a new authenticated `/timeline` page backed by a real `TimelineController` instead of the previous placeholder page.
-- Added a Frappe Gantt chart area that renders scheduled tickets as horizontal bars using each ticket's `start_date` and `due_date`.
-- Added smooth loading state, empty state, and success/error toast messaging.
-- Added urgency-based bar colors, blocked styling, and overdue styling.
-- Added read-only messaging for clients and editing-enabled messaging for Kiel users.
+### Drawer entry points
+- List view ticket links now open the drawer through AJAX while preserving the full ticket URL for normal browser navigation behavior.
+- Kanban cards now open the shared drawer instead of the prior lightweight board-only drawer.
+- Timeline Gantt task clicks now open the shared ticket drawer with the selected task loaded from `/tickets/{ticket}/drawer`.
 
-### Filters
-- Added Timeline filters for:
-  - Client
-  - Software
-  - Sprint
-  - Assignee, including Unassigned
-  - Urgency
-  - Status
-- Client users remain scoped to their own client data when viewing timeline data and filter options.
+### Endpoint and Blade partial
+- Added authenticated endpoint: `GET /tickets/{ticket}/drawer`.
+- Added reusable Blade partial: `tickets/partials/drawer`.
+- The endpoint enforces the existing Kiel/client ticket visibility rules and returns server-rendered drawer HTML.
 
-### Task metadata and drawer
-- Timeline task payloads now include:
-  - Ticket number and title
-  - Assignee
-  - Status
-  - Urgency
-  - Blocked indicator
-  - Overdue indicator
-  - Client
-  - Software
-  - Dependency label
-  - Full ticket URL
-- Added a right-side task drawer for timeline task review.
-- Added drawer controls for setting or clearing a task dependency when the user can edit the timeline.
+### Drawer content
+- Shows ticket number, title, description, status, urgency, assignee, dates, client, software, and sprint cycle.
+- Shows threaded comments and the activity timeline.
+- Shows a blocked banner with the active block reason and total blocked time when a ticket is blocked.
+- Shows timer controls for Kiel users.
+- Shows block/unblock controls for Kiel users.
+- Shows a recommend button for client users when the feature is eligible for recommendation.
 
-### Endpoints and service layer
-- Added authenticated endpoint: `GET /timeline`.
-- Added authenticated endpoint: `GET /timeline/data`.
-- Added authenticated endpoint: `PATCH /timeline/tasks/{ticket}/dates`.
-- Added authenticated endpoint: `PATCH /timeline/tasks/{ticket}/dependency`.
-- Added `TimelineService` to:
-  - Build Frappe Gantt-compatible JSON payloads.
-  - Enforce Kiel/client visibility rules.
-  - Restrict date and dependency edits to Kiel users.
-  - Validate and update drag/resize date changes.
-  - Validate and update task dependencies.
-  - Prevent circular dependencies.
-  - Log timeline date and dependency activity.
+### Inline interactions
+- Kiel users can inline edit title, description, urgency, assignee, status, start date, and due date from the drawer.
+- Inline edits call the existing `tickets.inline-update` endpoint and refresh drawer content afterward.
+- Comments and threaded replies can be added without leaving the drawer.
+- Drawer actions refresh comments/activity/ticket state after completion.
+- Client users keep read-only operational fields and can use comments or eligible recommendation actions.
 
-### Permission rules
-- Kiel users can view, drag, resize, and update dependencies.
-- Client users with `view timeline` can view their own client's timeline but cannot edit dates or dependencies.
-- Cross-client timeline data remains hidden from client users.
+### Drawer behavior
+- Drawer opens smoothly from the right side.
+- Drawer closes with the Escape key.
+- Drawer closes when clicking the backdrop outside the panel.
+- Drawer remains AJAX-driven, so users stay on the List, Kanban, or Timeline page.
 
 ### Verification performed
-- Added `TimelineWorkflowTest` coverage for:
-  - Timeline page rendering, filter bar, loading state, empty state, Frappe Gantt loading, and right-side drawer.
-  - Frappe Gantt JSON task formatting.
-  - Filter behavior across client, software, sprint, assignee, urgency, and status.
-  - Kiel drag date changes and resize deadline changes through the date update endpoint.
-  - Client edit rejection.
-  - Date-order validation.
-  - Dependency creation.
-  - Circular dependency rejection.
-- PHP syntax checks passed for the Timeline controller, service, routes, and feature test.
-- `npm run build` passed successfully.
-- `npm install dhtmlx-gantt --save-dev` and `npm install frappe-gantt --save-dev` were attempted, but the registry returned `403 Forbidden`; the Timeline view uses the Frappe Gantt CDN fallback.
-- `php artisan test --filter=TimelineWorkflowTest` could not run because `vendor/autoload.php` is unavailable until Composer dependencies are installable.
-- Browser-based drag/drop and resize checks could not be executed in this environment because Composer dependencies are unavailable and the Laravel app cannot boot.
+- Confirmed List view includes the shared drawer shell and ticket links target `/tickets/{ticket}/drawer`.
+- Confirmed Kanban view includes the shared drawer shell and card clicks target `/tickets/{ticket}/drawer`.
+- Confirmed Timeline task clicks call the shared drawer URL template for `/tickets/{ticket}/drawer`.
+- PHP syntax checks passed for routes, the Ticket controller, and the Feature controller.
+- Full Laravel/browser execution could not run in this container because Composer dependencies are not installed (`vendor/autoload.php` is unavailable).
 
 ### Next planned task
-Implement right-side task drawer and unified ticket detail interactions.
+Implement dashboards and reporting/export.

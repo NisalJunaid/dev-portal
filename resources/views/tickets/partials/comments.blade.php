@@ -12,7 +12,7 @@
             </div>
             <p class="mt-4 whitespace-pre-line text-sm leading-6 text-slate-700">{{ $comment->comment }}</p>
 
-            <form method="POST" action="{{ route('tickets.comments.store', $ticket) }}" class="mt-4 flex gap-2">
+            <form method="POST" action="{{ route('tickets.comments.store', $ticket) }}" data-drawer-comment-form class="mt-4 flex gap-2">
                 @csrf
                 <input type="hidden" name="parent_id" value="{{ $comment->id }}">
                 <input name="comment" class="min-w-0 flex-1 rounded-2xl border-slate-200 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" placeholder="Reply to this comment">

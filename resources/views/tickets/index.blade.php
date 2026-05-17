@@ -21,5 +21,6 @@
         </section>
 
         @include('tickets.partials.list-view')
+        @include('tickets.partials.drawer')
     </div>
 </x-app-layout>
