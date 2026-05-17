@@ -1,7 +1,19 @@
 <x-app-layout>
     <x-slot name="header">Tasks</x-slot>
 
-    <div x-data="{ activeView: @js($activeView), showFilters: false }" class="space-y-4">
+    <div
+        x-data="{
+            showFilters: false,
+            init() {
+                this.showFilters = localStorage.getItem('kiel.tasks.filters.open') === '1';
+            },
+            toggleFilters() {
+                this.showFilters = !this.showFilters;
+                localStorage.setItem('kiel.tasks.filters.open', this.showFilters ? '1' : '0');
+            }
+        }"
+        class="space-y-4"
+    >
         <section class="card flex items-center justify-between py-4">
             <h2 class="text-2xl font-black text-slate-950">Tasks</h2>
             @if ($isKielUser)
@@ -11,25 +23,23 @@
 
         <section class="card flex items-center justify-between py-3">
             <div class="flex items-center gap-2 text-sm font-bold">
-                <a href="{{ route('tasks.index', array_merge(request()->query(), ['view' => 'list'])) }}" :class="activeView==='list' ? 'bg-slate-900 text-white' : 'text-slate-600'" class="rounded-xl px-3 py-1.5">List</a>
-                <a href="{{ route('tasks.index', array_merge(request()->query(), ['view' => 'board'])) }}" :class="activeView==='board' ? 'bg-slate-900 text-white' : 'text-slate-600'" class="rounded-xl px-3 py-1.5">Board</a>
-                <a href="{{ route('tasks.index', array_merge(request()->query(), ['view' => 'timeline'])) }}" :class="activeView==='timeline' ? 'bg-slate-900 text-white' : 'text-slate-600'" class="rounded-xl px-3 py-1.5">Timeline</a>
+                <a href="{{ route('tasks.index', array_merge(request()->query(), ['view' => 'list'])) }}" class="rounded-xl px-3 py-1.5 {{ $activeView === 'list' ? 'bg-slate-900 text-white' : 'text-slate-600' }}">List</a>
+                <a href="{{ route('tasks.index', array_merge(request()->query(), ['view' => 'board'])) }}" class="rounded-xl px-3 py-1.5 {{ $activeView === 'board' ? 'bg-slate-900 text-white' : 'text-slate-600' }}">Board</a>
+                <a href="{{ route('tasks.index', array_merge(request()->query(), ['view' => 'timeline'])) }}" class="rounded-xl px-3 py-1.5 {{ $activeView === 'timeline' ? 'bg-slate-900 text-white' : 'text-slate-600' }}">Timeline</a>
             </div>
-            <button type="button" @click="showFilters=!showFilters" class="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-1.5 text-sm font-bold text-slate-700">
+            <button type="button" @click="toggleFilters" class="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-1.5 text-sm font-bold text-slate-700" :aria-expanded="showFilters.toString()">
                 <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M3 5h14v2H3V5zm3 4h8v2H6V9zm3 4h2v2H9v-2z"/></svg>
-                Filters
+                <span class="sr-only sm:not-sr-only">Filters</span>
             </button>
         </section>
 
-        <div x-show="activeView==='list'">
-            @include('tasks.partials.list-view')
-        </div>
-        <div x-show="activeView==='board'">
+        @if ($activeView === 'board')
             @include('tasks.partials.kanban-view', ['activeView' => 'all', 'columns' => $kanbanColumns, 'ticketsByColumn' => $kanbanTicketsByColumn, 'canMove' => $canMove])
-        </div>
-        <div x-show="activeView==='timeline'">
+        @elseif ($activeView === 'timeline')
             @include('tasks.partials.timeline-view', ['canEdit' => $canEditTimeline])
-        </div>
+        @else
+            @include('tasks.partials.list-view')
+        @endif
 
         @include('tickets.partials.drawer')
     </div>

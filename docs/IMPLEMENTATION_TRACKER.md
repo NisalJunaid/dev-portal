@@ -101,3 +101,29 @@ Implemented a unified task workspace at `/tasks` (`tasks.index`) where List, Boa
 
 ### Next planned task
 Production hardening and deployment preparation.
+
+## Completed: Sidebar + unified workspace routing hardening
+
+### Summary
+- Updated sidebar navigation to the unified structure and removed legacy top-level Tickets/Bugs/Features/Timeline items.
+- Added desktop sidebar collapse and drag-resize behavior with localStorage persistence.
+- Redirected legacy workspace index routes (`/tickets`, `/kanban`, `/timeline`) to `/tasks` tab views while preserving AJAX endpoints and ticket detail/create routes.
+- Hardened unified task workspace view selection so invalid `view` query values default to `list`.
+
+### Files changed
+- `resources/views/components/app-layout.blade.php`
+- `routes/web.php`
+- `app/Http/Controllers/TaskWorkspaceController.php`
+- `resources/views/tasks/index.blade.php`
+
+### Tests/checks run
+- `php artisan route:list`
+- `php artisan test`
+- `php artisan view:clear`
+- `php artisan optimize:clear`
+
+### Remaining known issues
+- Laravel artisan/test commands remain blocked in this container when vendor dependencies are unavailable.
+
+### Next planned task
+Production hardening and deployment preparation.
