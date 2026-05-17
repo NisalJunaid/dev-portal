@@ -55,8 +55,8 @@ Production hardening and deployment preparation.
 
 ## Issue: Ticket drawer Blade parse failure
 
-- exact file fixed: `resources/views/tickets/partials/drawer.blade.php`.
-- exact directive mismatch found: prior revisions had a top-level mode switch that alternated between a shared `@else` branch and extra/shifted closing directives, causing compiled output to intermittently fail with `unexpected token "else"` or `unexpected token "endif"`.
-- fix applied: retained the safe two-block top-level structure only (`@if ($mode === 'content') ... @endif` then `@if ($mode !== 'content') ... @endif`), with no top-level `@else` and no `@unless` in this file.
-- verification result: top-level directive balance in `drawer.blade.php` is correct (content opens/closes once and shell opens/closes once); included partials `resources/views/tickets/partials/comments.blade.php` and `resources/views/tickets/partials/activity-timeline.blade.php` already use valid `@forelse/@empty/@endforelse`; `php artisan view:clear` and `php artisan optimize:clear` cannot run in this container because `vendor/autoload.php` is missing; local `/tickets` reload could not be executed here.
+- root cause: `resources/views/tickets/partials/drawer.blade.php` mixed ticket-specific drawer content and global shell/JavaScript behind fragile mode-based Blade conditionals (`$mode === 'content'` and `$mode !== 'content'`), which repeatedly led to directive-balance parse failures.
+- fix: split the partial into `resources/views/tickets/partials/drawer.blade.php` (shell + JS only) and `resources/views/tickets/partials/drawer-content.blade.php` (ticket content only, including local `$latestSprint`, `$statusOptions`, and `$timerPayload` calculations).
+- updated route/controller: `TicketController@drawer` now renders `view('tickets.partials.drawer-content', [...])` for AJAX drawer HTML, with the required ticket/timer/block/comment/team/recommendation payload variables.
+- verification: mode-based usages were removed from the codebase search; `/tickets` shell include remains intact; view cache clear commands were attempted but could not run in this container because `vendor/autoload.php` is missing.
 - next planned task unchanged: Production hardening and deployment preparation.
