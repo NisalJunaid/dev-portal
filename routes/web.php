@@ -4,6 +4,7 @@ use App\Http\Controllers\BugController;
 use App\Http\Controllers\ClientController;
 use App\Http\Controllers\FeatureController;
 use App\Http\Controllers\KanbanController;
+use App\Http\Controllers\ReportController;
 use App\Http\Controllers\TimelineController;
 use App\Http\Controllers\App\DashboardController;
 use App\Http\Controllers\App\PageController;
@@ -69,11 +70,19 @@ Route::middleware('auth')->group(function () {
     Route::post('/sprints/start', [SprintController::class, 'start'])->name('sprints.start.store');
     Route::post('/sprints/{sprint}/complete', [SprintController::class, 'complete'])->name('sprints.complete');
 
-    foreach (['reports', 'settings'] as $section) {
-        Route::get('/'.$section, PageController::class)
-            ->defaults('section', $section)
-            ->name($section.'.index');
-    }
+    Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
+    Route::get('/reports/time', [ReportController::class, 'time'])->name('reports.time');
+    Route::get('/reports/tickets', [ReportController::class, 'tickets'])->name('reports.tickets');
+    Route::get('/reports/sprints', [ReportController::class, 'sprints'])->name('reports.sprints');
+    Route::get('/reports/blocked', [ReportController::class, 'blocked'])->name('reports.blocked');
+    Route::get('/reports/export/time', [ReportController::class, 'export'])->defaults('type', 'time')->name('reports.export.time');
+    Route::get('/reports/export/tickets', [ReportController::class, 'export'])->defaults('type', 'tickets')->name('reports.export.tickets');
+    Route::get('/reports/export/sprints', [ReportController::class, 'export'])->defaults('type', 'sprints')->name('reports.export.sprints');
+    Route::get('/reports/export/blocked', [ReportController::class, 'export'])->defaults('type', 'blocked')->name('reports.export.blocked');
+
+    Route::get('/settings', PageController::class)
+        ->defaults('section', 'settings')
+        ->name('settings.index');
 });
 
 require __DIR__.'/auth.php';
