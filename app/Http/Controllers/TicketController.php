@@ -206,8 +206,7 @@ class TicketController extends Controller
         $totalBlockedDuration = $this->ticketBlockService->totalBlockedDurationForTicket($ticket);
 
         return response()->json([
-            'html' => view('tickets.partials.drawer', [
-                'mode' => 'content',
+            'html' => view('tickets.partials.drawer-content', [
                 'ticket' => $ticket,
                 'comments' => $comments,
                 'teamMembers' => $this->teamMembers(),
