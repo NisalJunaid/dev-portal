@@ -283,3 +283,34 @@ Production hardening and deployment preparation.
 
 ### Next planned task
 Production hardening and deployment preparation.
+
+## Completed: Tasks controls/dropdowns/drawer/timeline height stabilization
+
+### Summary
+- fixed dropdown auto-close by removing root click-close behavior and using an explicit `openMenu` dropdown manager with a full-screen overlay click-catcher.
+- rewrote the tasks toolbar block with clean two-side flex structure and corrected markup nesting so all right-side controls are inside the same wrapper.
+- fixed Create Task drawer open behavior and title autofocus from workspace controls.
+- verified JSON task creation path remains active in `TicketController@store` while preserving non-JSON redirect behavior for full-page `/tickets/create` flow.
+- refactored task partial refresh flow in `TaskWorkspaceController` to use shared `workspaceData()` for index + partial rendering.
+- corrected timeline inner chart container sizing to fill available height naturally via shell/container CSS plus runtime `expandTimelineHeight()`.
+- removed timeline scheduled-count header and kept empty-state as an in-shell overlay.
+
+### Files changed
+- `resources/views/tasks/index.blade.php`
+- `resources/views/tasks/partials/create-task-drawer.blade.php`
+- `resources/views/tasks/partials/timeline-view.blade.php`
+- `resources/css/app.css`
+- `app/Http/Controllers/TaskWorkspaceController.php`
+- `docs/IMPLEMENTATION_TRACKER.md`
+
+### Tests/checks run
+- `php artisan view:clear`
+- `php artisan optimize:clear`
+- `php artisan route:list`
+- `php artisan test`
+
+### Known issues
+- artisan/test command execution may still fail in environments where Composer vendor dependencies are missing.
+
+### Next planned task
+Production hardening and deployment preparation.

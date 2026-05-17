@@ -9,7 +9,7 @@
             <form class="flex-1 overflow-y-auto p-5 space-y-4" @submit.prevent="submitCreateTask">
                 <template x-if="createTaskErrors.global"><p class="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700" x-text="createTaskErrors.global"></p></template>
                 <label class="block text-sm font-semibold text-slate-700">Title
-                    <input x-model="createTaskForm.title" type="text" class="mt-1 w-full rounded-xl border-slate-200 text-sm" required>
+                    <input x-model="createTaskForm.title" data-create-task-title type="text" class="mt-1 w-full rounded-xl border-slate-200 text-sm" required>
                     <span class="mt-1 block text-xs text-rose-600" x-text="createTaskErrors.title"></span>
                 </label>
                 <label class="block text-sm font-semibold text-slate-700">Description
