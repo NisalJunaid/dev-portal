@@ -52,3 +52,10 @@ The following user-facing surfaces are covered by HTTP render checks in the QA s
 
 ### Next planned task
 Production hardening and deployment preparation.
+
+## Issue: Ticket drawer Blade parse failure
+
+- issue: `resources/views/tickets/partials/drawer.blade.php` had an unsafe/miscompiled top-level `@if/@else` structure.
+- fix: replaced it with two independent top-level `@if` blocks (`@if ($mode === 'content') ... @endif` and `@if ($mode !== 'content') ... @endif`).
+- verification: attempted `php artisan view:clear` and `php artisan optimize:clear` (blocked in this container because `vendor/autoload.php` is missing), and attempted to load `/tickets` at `http://localhost:8000/tickets` (no local server listening).
+- next planned task unchanged: Production hardening and deployment preparation.
