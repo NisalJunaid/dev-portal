@@ -271,9 +271,13 @@ class QualityAssuranceFeatureTest extends TestCase
         $ticket = $this->ticket($client, $software, $clientUser, Ticket::TYPE_FEATURE, Ticket::STATUS_FEATURE_APPROVED, 'Manual QA ticket');
         $ticket->update(['start_date' => '2026-05-18', 'due_date' => '2026-05-20']);
 
-        $this->actingAs($developer)->get(route('tickets.index'))->assertOk()->assertSee('Manual QA ticket');
-        $this->actingAs($developer)->get(route('kanban.index'))->assertOk()->assertSee('data-kanban-board', false);
-        $this->actingAs($developer)->get(route('timeline.index'))->assertOk()->assertSee('frappe-gantt', false);
+        $this->actingAs($developer)->get(route('tasks.index'))->assertOk()->assertSee('Manual QA ticket');
+        $this->actingAs($developer)->get(route('tasks.index', ['view' => 'list']))->assertOk();
+        $this->actingAs($developer)->get(route('tasks.index', ['view' => 'board']))->assertOk();
+        $this->actingAs($developer)->get(route('tasks.index', ['view' => 'timeline']))->assertOk();
+        $this->actingAs($developer)->get(route('tickets.index'))->assertRedirectContains('/tasks');
+        $this->actingAs($developer)->get(route('kanban.index'))->assertRedirectContains('/tasks');
+        $this->actingAs($developer)->get(route('timeline.index'))->assertRedirectContains('/tasks');
         $this->actingAs($developer)->getJson(route('tickets.drawer', $ticket))->assertOk()->assertSee('Manual QA ticket', false);
         $this->actingAs($developer)->get(route('reports.index'))->assertOk()->assertSee('Reports');
         $this->actingAs($developer)->get(route('dashboard'))->assertOk()->assertSee('Kiel global workspace');

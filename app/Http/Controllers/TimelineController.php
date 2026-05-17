@@ -20,19 +20,11 @@ class TimelineController extends Controller
     {
     }
 
-    public function index(Request $request): View
+    public function index(Request $request): \Illuminate\Http\RedirectResponse
     {
         abort_unless($request->user()->can('view timeline'), 403);
 
-        return view('timeline.index', [
-            'canEdit' => $this->timelineService->canEdit($request->user()),
-            'clients' => $this->clients($request->user()),
-            'softwares' => $this->softwares($request->user()),
-            'sprints' => $this->sprints($request->user()),
-            'assignees' => $this->assignees($request->user()),
-            'urgencies' => Ticket::URGENCIES,
-            'statuses' => Ticket::STATUSES,
-        ]);
+        return redirect()->route('tasks.index', array_merge($request->query(), ['view' => 'timeline']));
     }
 
     public function data(Request $request): JsonResponse

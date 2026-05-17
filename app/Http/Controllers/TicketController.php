@@ -31,7 +31,14 @@ class TicketController extends Controller
     ) {
     }
 
-    public function index(Request $request): View
+    public function index(Request $request): \Illuminate\Http\RedirectResponse
+    {
+        abort_unless($request->user()->can('view tickets'), 403);
+
+        return redirect()->route('tasks.index', array_merge($request->query(), ['view' => 'list']));
+    }
+
+    public function legacyIndexData(Request $request): View
     {
         abort_unless($request->user()->can('view tickets'), 403);
 

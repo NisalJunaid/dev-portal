@@ -12,6 +12,7 @@ use App\Http\Controllers\SoftwareController;
 use App\Http\Controllers\SprintController;
 use App\Http\Controllers\TicketController;
 use App\Http\Controllers\TicketBlockController;
+use App\Http\Controllers\TaskWorkspaceController;
 use App\Http\Controllers\TimeTrackingController;
 use Illuminate\Support\Facades\Route;
 
@@ -26,6 +27,7 @@ Route::middleware('auth')->group(function () {
     Route::patch('/softwares/{software}/toggle', [SoftwareController::class, 'toggle'])->name('softwares.toggle');
     Route::resource('softwares', SoftwareController::class)->only(['index', 'create', 'store', 'edit', 'update']);
 
+    Route::get('/tasks', [TaskWorkspaceController::class, 'index'])->name('tasks.index');
     Route::get('/kanban', [KanbanController::class, 'index'])->name('kanban.index');
     Route::get('/timeline', [TimelineController::class, 'index'])->name('timeline.index');
     Route::get('/timeline/data', [TimelineController::class, 'data'])->name('timeline.data');

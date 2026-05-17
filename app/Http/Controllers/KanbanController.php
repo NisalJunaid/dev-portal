@@ -15,23 +15,11 @@ class KanbanController extends Controller
     {
     }
 
-    public function index(Request $request): View
+    public function index(Request $request): \Illuminate\Http\RedirectResponse
     {
         abort_unless($request->user()->can('view tickets'), 403);
 
-        $validated = $request->validate([
-            'view' => ['nullable', Rule::in([KanbanService::VIEW_ALL, KanbanService::VIEW_BUGS, KanbanService::VIEW_FEATURES, KanbanService::VIEW_SPRINT])],
-        ]);
-
-        $view = $validated['view'] ?? KanbanService::VIEW_ALL;
-
-        return view('kanban.index', [
-            'activeView' => $view,
-            'views' => $this->views(),
-            'columns' => $this->kanbanService->columnsFor($view),
-            'ticketsByColumn' => $this->kanbanService->groupedTickets($request->user(), $view),
-            'canMove' => $request->user()->isKielUser() || $request->user()->isClientUser(),
-        ]);
+        return redirect()->route('tasks.index', array_merge($request->query(), ['view' => 'board']));
     }
 
     public function move(Request $request, Ticket $ticket): JsonResponse

@@ -67,3 +67,37 @@ Production hardening and deployment preparation.
 - fix: updated timeline task payload generation to emit single-token urgency classes with blocked/overdue suffixes (for example, `timeline-urgency-high-blocked`) instead of space-joined class lists.
 - verification: timeline task payload assertions now enforce that every `custom_class` exists, is a string, and contains no whitespace; timeline styling selectors were updated to target the single-token variants so bars retain urgency, blocked, and overdue visual distinctions.
 - next planned task unchanged: Production hardening and deployment preparation.
+
+## Completed: Unified Tasks workspace (List/Board/Timeline tabs)
+
+### Summary
+Implemented a unified task workspace at `/tasks` (`tasks.index`) where List, Board, and Timeline are compact tabs on a single production-style page. Legacy standalone routes (`/tickets`, `/kanban`, `/timeline`) now redirect into the unified workspace with the corresponding active tab query.
+
+### What changed
+- Added `TaskWorkspaceController` to consolidate task workspace data for list, board, and timeline tab rendering.
+- Added `resources/views/tasks/index.blade.php` with compact toolbar, tab navigation, and filter toggle button.
+- Extracted/reused tab partials:
+  - `resources/views/tasks/partials/list-view.blade.php`
+  - `resources/views/tasks/partials/kanban-view.blade.php`
+  - `resources/views/tasks/partials/timeline-view.blade.php`
+- Filters are hidden by default and expanded/collapsed using a compact Filters button.
+- Existing floating toast behavior remains via `window.Kiel.toast(...)` in list/board/timeline interactions.
+- Removed standalone-page feel by moving task UI into a single unified page.
+- Kept AJAX endpoints unchanged (`timeline.data`, timeline patch endpoints, drawer, inline update, kanban move/reorder).
+- Kept timeline `custom_class` behavior unchanged from prior fix (single token class with no whitespace).
+
+### Route behavior
+- New primary route: `GET /tasks` (`tasks.index`) with `?view=list|board|timeline`.
+- `GET /tickets` redirects to `/tasks?view=list`.
+- `GET /kanban` redirects to `/tasks?view=board`.
+- `GET /timeline` redirects to `/tasks?view=timeline`.
+
+### Tests/checks
+- Updated feature render coverage to include `/tasks` tab query variants and legacy-route redirects.
+- Attempted to run required commands in container; execution remains blocked by missing `vendor/autoload.php`.
+
+### Remaining known issues
+- PHPUnit/artisan commands still cannot run in this container due to missing Composer vendor dependencies.
+
+### Next planned task
+Production hardening and deployment preparation.
