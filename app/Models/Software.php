@@ -9,6 +9,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Software extends Model
 {
+
+    protected $table = 'softwares';
+    
     use HasFactory;
 
     protected $fillable = [

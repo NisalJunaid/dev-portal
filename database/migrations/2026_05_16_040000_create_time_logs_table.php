@@ -16,7 +16,7 @@ return new class extends Migration
             $table->foreignId('ticket_id')->constrained()->cascadeOnDelete();
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
             $table->foreignId('client_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('software_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('software_id')->constrained('softwares')->cascadeOnDelete();
             $table->timestamp('started_at');
             $table->timestamp('paused_at')->nullable();
             $table->timestamp('resumed_at')->nullable();

@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('sprints', function (Blueprint $table) {
             $table->id();
             $table->foreignId('client_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('software_id')->nullable()->constrained()->nullOnDelete();
+            $table->foreignId('software_id')->constrained('softwares')->cascadeOnDelete();
             $table->integer('sprint_no');
             $table->string('name');
             $table->enum('status', ['planned', 'in_progress', 'completed'])->default('planned');
