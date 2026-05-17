@@ -8,6 +8,7 @@ use App\Models\TicketComment;
 use App\Models\User;
 use App\Services\TicketActivityService;
 use App\Services\TicketNumberService;
+use App\Services\TimeTrackingService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -19,6 +20,7 @@ class TicketController extends Controller
     public function __construct(
         private readonly TicketNumberService $ticketNumberService,
         private readonly TicketActivityService $ticketActivityService,
+        private readonly TimeTrackingService $timeTrackingService,
     ) {
     }
 
@@ -101,6 +103,12 @@ class TicketController extends Controller
 
         $ticket->load(['client', 'software', 'submitter', 'assignee', 'activities.user']);
         $comments = $this->visibleComments($request, $ticket);
+        $currentTimer = $request->user()->isKielUser()
+            ? $this->timeTrackingService->activeTimerFor($ticket, $request->user())->latest()->first()
+            : null;
+        $cumulativeDuration = $request->user()->isKielUser()
+            ? $this->timeTrackingService->cumulativeDurationForTicket($ticket)
+            : null;
 
         return view('tickets.show', [
             'ticket' => $ticket,
@@ -108,6 +116,8 @@ class TicketController extends Controller
             'teamMembers' => $this->teamMembers(),
             'softwares' => Software::with('client')->where('is_enabled', true)->orderBy('name')->get(),
             'isKielUser' => $request->user()->isKielUser(),
+            'currentTimer' => $currentTimer,
+            'cumulativeDuration' => $cumulativeDuration,
         ]);
     }
 
@@ -228,6 +238,10 @@ class TicketController extends Controller
 
         if ($oldValues['status'] !== $ticket->status) {
             $this->ticketActivityService->log($ticket, 'status changed', 'Ticket status updated.', $request->user(), $oldValues['status'], $ticket->status);
+
+            if (in_array($ticket->status, [Ticket::STATUS_BUG_BLOCKED, Ticket::STATUS_FEATURE_BLOCKED], true)) {
+                $this->timeTrackingService->pauseRunningTimersForBlockedTicket($ticket, $request->user());
+            }
         }
 
         if ($this->datesChanged($oldValues, $ticket)) {

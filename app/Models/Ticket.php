@@ -120,6 +120,11 @@ class Ticket extends Model
         return $this->hasMany(TicketActivity::class)->latest();
     }
 
+    public function timeLogs(): HasMany
+    {
+        return $this->hasMany(TimeLog::class);
+    }
+
     public function sprints(): BelongsToMany
     {
         return $this->belongsToMany(Sprint::class, 'sprint_items')->withPivot('position')->withTimestamps();

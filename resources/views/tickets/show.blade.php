@@ -80,6 +80,8 @@
                 </section>
 
                 @if ($isKielUser)
+                    @include('tickets.partials.timer-panel', ['ticket' => $ticket, 'currentTimer' => $currentTimer, 'cumulativeDuration' => $cumulativeDuration])
+
                     <section class="card space-y-5">
                         <h3 class="text-lg font-black text-slate-950">Kiel controls</h3>
 

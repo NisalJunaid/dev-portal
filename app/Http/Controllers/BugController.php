@@ -7,6 +7,7 @@ use App\Models\Ticket;
 use App\Models\TicketComment;
 use App\Models\User;
 use App\Services\TicketActivityService;
+use App\Services\TimeTrackingService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -22,8 +23,10 @@ class BugController extends Controller
         Ticket::STATUS_BUG_COMPLETED => [Ticket::STATUS_BUG_PENDING, Ticket::STATUS_BUG_BLOCKED, Ticket::STATUS_BUG_COMPLETED],
     ];
 
-    public function __construct(private readonly TicketActivityService $ticketActivityService)
-    {
+    public function __construct(
+        private readonly TicketActivityService $ticketActivityService,
+        private readonly TimeTrackingService $timeTrackingService,
+    ) {
     }
 
     public function index(Request $request): View
@@ -107,6 +110,10 @@ class BugController extends Controller
                     : 'Bug status updated.';
 
                 $this->ticketActivityService->log($ticket, 'bug status changed', $description, $request->user(), $oldStatus, $newStatus);
+
+                if ($newStatus === Ticket::STATUS_BUG_BLOCKED) {
+                    $this->timeTrackingService->pauseRunningTimersForBlockedTicket($ticket, $request->user());
+                }
             }
         });
 
