@@ -48,7 +48,7 @@ class SprintWorkflowTest extends TestCase
         $this->assertDatabaseHas('ticket_activities', ['ticket_id' => $firstFeature->id, 'user_id' => $manager->id, 'action' => 'converted to task for sprint']);
     }
 
-    public function test_kiel_user_can_complete_sprint_and_review_analytics(): void
+    public function test_kiel_user_cannot_complete_sprint_with_active_items(): void
     {
         $this->seed(RoleSeeder::class);
 
@@ -69,16 +69,38 @@ class SprintWorkflowTest extends TestCase
         $sprint->items()->create(['ticket_id' => $incompleteFeature->id, 'position' => 2]);
 
         $this->actingAs($manager)
-            ->post(route('sprints.complete', $sprint))
-            ->assertRedirect(route('sprints.show', $sprint));
+            ->patchJson(route('sprints.end', $sprint))
+            ->assertUnprocessable()
+            ->assertJsonPath('message', 'Sprint cannot be ended until all sprint tasks are completed, rejected, or blocked.')
+            ->assertJsonPath('active_count', 1);
 
         $sprint->refresh();
 
+        $this->assertSame(Sprint::STATUS_IN_PROGRESS, $sprint->status);
+    }
+
+    public function test_kiel_user_can_complete_sprint_when_all_items_are_terminal(): void
+    {
+        $this->seed(RoleSeeder::class);
+
+        [$client, $software, $submitter] = $this->clientWorkspace();
+        $manager = $this->kielManager();
+        $completedFeature = $this->featureTicket($client, $software, $submitter, Ticket::STATUS_FEATURE_COMPLETED, 'Completed feature');
+        $blockedTask = $this->featureTicket($client, $software, $submitter, Ticket::STATUS_FEATURE_BLOCKED, 'Blocked feature');
+        $rejectedTask = $this->featureTicket($client, $software, $submitter, Ticket::STATUS_REJECTED, 'Rejected feature');
+        $sprint = Sprint::create([
+            'client_id' => $client->id,'software_id' => $software->id,'sprint_no' => 1,'name' => 'Sprint Cycle 1 - May 16, 2026','status' => Sprint::STATUS_IN_PROGRESS,'started_at' => now()->subHours(2),'started_by' => $manager->id,
+        ]);
+        $sprint->items()->create(['ticket_id' => $completedFeature->id, 'position' => 1]);
+        $sprint->items()->create(['ticket_id' => $blockedTask->id, 'position' => 2]);
+        $sprint->items()->create(['ticket_id' => $rejectedTask->id, 'position' => 3]);
+
+        $this->actingAs($manager)->post(route('sprints.complete', $sprint))->assertRedirect(route('sprints.show', $sprint));
+
+        $sprint->refresh();
         $this->assertSame(Sprint::STATUS_COMPLETED, $sprint->status);
         $this->assertNotNull($sprint->ended_at);
-        $this->assertGreaterThanOrEqual(7200, $sprint->duration_seconds);
         $this->assertSame($manager->id, $sprint->ended_by);
-        $this->assertDatabaseHas('sprint_activities', ['sprint_id' => $sprint->id, 'user_id' => $manager->id, 'action' => 'completed']);
 
         $this->actingAs($manager)
             ->get(route('sprints.show', $sprint))

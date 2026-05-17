@@ -255,6 +255,33 @@ class Ticket extends Model
         return in_array($this->status, [self::STATUS_BUG_BLOCKED, self::STATUS_FEATURE_BLOCKED], true);
     }
 
+    public function isTerminalForSprint(): bool
+    {
+        $terminalStatuses = array_values(array_filter([
+            self::STATUS_BUG_COMPLETED,
+            self::STATUS_FEATURE_COMPLETED,
+            self::STATUS_REJECTED,
+            self::STATUS_BUG_BLOCKED,
+            self::STATUS_FEATURE_BLOCKED,
+            defined('self::STATUS_TASK_COMPLETED') ? self::STATUS_TASK_COMPLETED : null,
+            defined('self::STATUS_TASK_BLOCKED') ? self::STATUS_TASK_BLOCKED : null,
+        ]));
+
+        return in_array($this->status, $terminalStatuses, true);
+    }
+
+    public function isActiveForSprint(): bool
+    {
+        return ! $this->isTerminalForSprint();
+    }
+
+    public function isGeneratedSprintTask(): bool
+    {
+        return $this->type === self::TYPE_TASK
+            && $this->is_generated_task
+            && $this->generated_from_sprint_id !== null;
+    }
+
     public function totalBlockedDurationSeconds(): int
     {
         return (int) $this->blocks()->get()->sum(fn (TicketBlock $block) => $block->currentDurationSeconds());

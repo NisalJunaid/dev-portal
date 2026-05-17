@@ -68,15 +68,22 @@ class SprintController extends Controller
             }
         }
 
-        $featureQuery = Ticket::query()->with(['software', 'submitter', 'assignee', 'parent'])->where('type', Ticket::TYPE_FEATURE)
+        $featureQuery = Ticket::query()->with(['software', 'submitter', 'assignee', 'parent', 'generatedTasks'])->where('type', Ticket::TYPE_FEATURE)
             ->when($selectedClientId, fn ($q) => $q->where('client_id', $selectedClientId));
 
         if (! $isKielUser) {
             $featureQuery->where('client_id', $request->user()->client_id);
         }
 
-        $approvedFeatures = (clone $featureQuery)->where('status', Ticket::STATUS_NEXT_SPRINT)->latest('updated_at')->get();
-        $futureFeatures = (clone $featureQuery)->whereIn('status', [Ticket::STATUS_FEATURE_APPROVED, Ticket::STATUS_RECOMMENDED])->latest('updated_at')->get();
+        $approvedFeatures = (clone $featureQuery)
+            ->where('status', Ticket::STATUS_NEXT_SPRINT)
+            ->whereDoesntHave('generatedTasks', fn ($q) => $q->whereHas('generatedFromSprint', fn ($s) => $s->where('status', Sprint::STATUS_COMPLETED)))
+            ->latest('updated_at')
+            ->get();
+        $futureFeatures = (clone $featureQuery)
+            ->whereIn('status', [Ticket::STATUS_FEATURE_APPROVED, Ticket::STATUS_RECOMMENDED])
+            ->latest('updated_at')
+            ->get();
 
         $canStartSprint = (bool) $selectedClientId && $approvedFeatures->isNotEmpty();
 
@@ -103,11 +110,12 @@ class SprintController extends Controller
         if ($currentSprint) {
             $currentSprint->load('tickets');
             $total = $currentSprint->tickets->count();
-            $completed = $currentSprint->tickets->filter(fn (Ticket $ticket) => method_exists($ticket, 'isDone') ? $ticket->isDone() : in_array($ticket->status, [Ticket::STATUS_BUG_COMPLETED, Ticket::STATUS_FEATURE_COMPLETED, 'task_completed'], true))->count();
+            $completed = $currentSprint->tickets->filter(fn (Ticket $ticket) => in_array($ticket->status, [Ticket::STATUS_BUG_COMPLETED, Ticket::STATUS_FEATURE_COMPLETED, Ticket::STATUS_TASK_COMPLETED], true))->count();
             $inProgress = $currentSprint->tickets->where('status', Ticket::STATUS_IN_PROGRESS)->count();
             $backlog = $currentSprint->tickets->where('status', Ticket::STATUS_BACKLOG)->count();
             $blocked = $currentSprint->tickets->filter(fn (Ticket $ticket) => $ticket->isBlocked())->count();
-            $remaining = max(0, $total - $completed);
+            $rejected = $currentSprint->tickets->where('status', Ticket::STATUS_REJECTED)->count();
+            $active = $currentSprint->tickets->filter(fn (Ticket $ticket) => $ticket->isActiveForSprint())->count();
 
             $currentSprintStats = [
                 'total_tasks' => $total,
@@ -115,7 +123,10 @@ class SprintController extends Controller
                 'in_progress_tasks' => $inProgress,
                 'backlog_tasks' => $backlog,
                 'blocked_tasks' => $blocked,
-                'remaining_tasks' => $remaining,
+                'rejected_tasks' => $rejected,
+                'remaining_tasks' => $active,
+                'active_count' => $active,
+                'can_end' => $active === 0,
                 'elapsed_seconds' => $currentSprint->elapsedSeconds(),
                 'timer_status' => $currentSprint->timer_status,
             ];
@@ -214,13 +225,27 @@ class SprintController extends Controller
         abort_unless($request->user()->isKielUser(), Response::HTTP_FORBIDDEN);
         $this->authorizeSprintAccess($request, $sprint);
         abort_unless($sprint->status === Sprint::STATUS_IN_PROGRESS, Response::HTTP_UNPROCESSABLE_ENTITY);
+        $sprint->load('tickets');
+        $activeItems = $sprint->tickets->filter(fn (Ticket $ticket) => $ticket->isActiveForSprint())->values();
+        if ($activeItems->isNotEmpty()) {
+            $message = 'Sprint cannot be ended until all sprint tasks are completed, rejected, or blocked.';
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'message' => $message,
+                    'active_count' => $activeItems->count(),
+                    'active_items' => $activeItems->take(5)->pluck('ticket_no')->values(),
+                ], 422);
+            }
+
+            throw ValidationException::withMessages(['sprint' => $message]);
+        }
 
         DB::transaction(function () use ($request, $sprint) {
-            $sprint->load('tickets');
-            $completedCount = $sprint->tickets->filter(fn (Ticket $ticket) => $ticket->isDone())->count();
-            $incompleteCount = $sprint->tickets->count() - $completedCount;
+            $completedCount = $sprint->tickets->whereIn('status', [Ticket::STATUS_BUG_COMPLETED, Ticket::STATUS_FEATURE_COMPLETED, Ticket::STATUS_TASK_COMPLETED])->count();
+            $blockedCount = $sprint->tickets->whereIn('status', [Ticket::STATUS_BUG_BLOCKED, Ticket::STATUS_FEATURE_BLOCKED])->count();
+            $rejectedCount = $sprint->tickets->where('status', Ticket::STATUS_REJECTED)->count();
             $sprint->update(['status' => Sprint::STATUS_COMPLETED,'ended_at' => now(),'duration_seconds' => $sprint->elapsedSeconds(),'timer_status' => Sprint::TIMER_COMPLETED,'ended_by' => $request->user()->id]);
-            $sprint->activities()->create(['user_id' => $request->user()->id,'action' => 'completed','description' => 'Sprint completed with '.$completedCount.' completed and '.$incompleteCount.' incomplete items.']);
+            $sprint->activities()->create(['user_id' => $request->user()->id,'action' => 'completed','description' => 'Sprint completed with '.$completedCount.' completed, '.$blockedCount.' blocked, and '.$rejectedCount.' rejected items.']);
         });
 
         return $request->expectsJson() ? response()->json(['message' => 'Sprint completed.', 'timer_status' => Sprint::TIMER_COMPLETED]) : redirect()->route('sprints.show', $sprint)->with('status', 'Sprint completed.');
