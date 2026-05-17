@@ -127,3 +127,16 @@ Production hardening and deployment preparation.
 
 ### Next planned task
 Production hardening and deployment preparation.
+
+
+## Update: Unified workspace undefined `view` key and nav cleanup
+
+### Summary
+- Fixed undefined array key risk in `TaskWorkspaceController` by normalizing requested `view` via null-coalescing fallback before validation and by passing a `filters` payload that always includes a resolved `view` key.
+- Confirmed sidebar navigation uses unified `Tasks` top-level entry and keeps legacy task route groups as active-state matches only.
+- Confirmed legacy workspace index routes redirect to unified `/tasks` tab views while preserving existing AJAX/task operation endpoints.
+- Confirmed desktop sidebar collapse/resize persistence behavior remains in place for unified app shell.
+- Ran required cache/route/test checks (environment limitations may still apply when vendor dependencies are unavailable).
+
+### Next planned task
+Production hardening and deployment preparation.
