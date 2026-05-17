@@ -27,13 +27,16 @@ class KanbanService
                 Ticket::STATUS_BUG_BLOCKED => 'Blocked',
                 Ticket::STATUS_BUG_COMPLETED => 'Completed',
             ],
-            self::VIEW_FEATURES, self::VIEW_SPRINT => [
+            self::VIEW_FEATURES => [
                 Ticket::STATUS_FEATURE_APPROVED => 'Approved',
                 Ticket::STATUS_RECOMMENDED => 'Recommended',
                 Ticket::STATUS_NEXT_SPRINT => 'Next Sprint',
+            ],
+            self::VIEW_SPRINT => [
+                Ticket::STATUS_BACKLOG => 'Backlog',
                 Ticket::STATUS_IN_PROGRESS => 'In Progress',
-                Ticket::STATUS_FEATURE_BLOCKED => 'Blocked',
-                Ticket::STATUS_FEATURE_COMPLETED => 'Completed',
+                'blocked' => 'Blocked',
+                'completed' => 'Completed',
             ],
             default => [
                 Ticket::STATUS_BACKLOG => 'Backlog',
@@ -58,8 +61,17 @@ class KanbanService
         return match ($view) {
             self::VIEW_BUGS => $query->where('type', Ticket::TYPE_BUG)->whereIn('status', Ticket::BUG_STATUSES),
             self::VIEW_FEATURES => $query->where('type', Ticket::TYPE_FEATURE)->whereIn('status', Ticket::FEATURE_STATUSES),
-            self::VIEW_SPRINT => $query->where('type', Ticket::TYPE_FEATURE)->whereIn('status', Ticket::FEATURE_STATUSES),
-            default => $query,
+            self::VIEW_SPRINT => $query->where(function ($q) {
+                $q->where('is_generated_task', true)
+                    ->orWhere('type', Ticket::TYPE_TASK)
+                    ->orWhere('type', Ticket::TYPE_BUG);
+            }),
+            default => $query->where(function ($q) {
+                $q->where('type', Ticket::TYPE_BUG)
+                    ->orWhere('is_generated_task', true)
+                    ->orWhere('type', Ticket::TYPE_TASK)
+                    ->orWhereNull('type');
+            }),
         };
     }
 
@@ -190,10 +202,12 @@ class KanbanService
         return match ($view) {
             self::VIEW_BUGS => $ticket->isBug() ? Ticket::BUG_STATUSES : [],
             self::VIEW_FEATURES => $ticket->isFeature() ? Ticket::FEATURE_STATUSES : [],
-            self::VIEW_SPRINT => $ticket->isFeature() ? Ticket::FEATURE_STATUSES : [],
+            self::VIEW_SPRINT => ($ticket->isBug() || $ticket->is_generated_task || $ticket->type === Ticket::TYPE_TASK || $ticket->type === null)
+                ? [Ticket::STATUS_BACKLOG, Ticket::STATUS_IN_PROGRESS, Ticket::STATUS_FEATURE_BLOCKED, Ticket::STATUS_BUG_BLOCKED, Ticket::STATUS_FEATURE_COMPLETED, Ticket::STATUS_BUG_COMPLETED]
+                : [],
             default => $ticket->isBug()
                 ? [Ticket::STATUS_BUG_PENDING, Ticket::STATUS_BUG_BLOCKED, Ticket::STATUS_BUG_COMPLETED, Ticket::STATUS_REJECTED]
-                : ($ticket->isFeature() ? [Ticket::STATUS_FEATURE_APPROVED, Ticket::STATUS_RECOMMENDED, Ticket::STATUS_NEXT_SPRINT, Ticket::STATUS_IN_PROGRESS, Ticket::STATUS_FEATURE_BLOCKED, Ticket::STATUS_FEATURE_COMPLETED, Ticket::STATUS_REJECTED] : [Ticket::STATUS_BACKLOG, Ticket::STATUS_REJECTED]),
+                : ($ticket->isFeature() ? [Ticket::STATUS_FEATURE_APPROVED, Ticket::STATUS_RECOMMENDED, Ticket::STATUS_NEXT_SPRINT, Ticket::STATUS_REJECTED] : [Ticket::STATUS_BACKLOG, Ticket::STATUS_IN_PROGRESS, Ticket::STATUS_FEATURE_BLOCKED, Ticket::STATUS_FEATURE_COMPLETED, Ticket::STATUS_REJECTED]),
         };
     }
 

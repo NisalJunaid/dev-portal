@@ -314,3 +314,28 @@ Production hardening and deployment preparation.
 
 ### Next planned task
 Production hardening and deployment preparation.
+
+## Completed: Corrected sprint lifecycle wrapper + Kanban drag/drop payload alignment
+
+### Summary
+- corrected sprint start lifecycle so planned `next_sprint` feature records are now converted into generated implementation task tickets at sprint start rather than moved directly into execution status.
+- sprint now acts as a wrapper around generated implementation tasks and selected bugs.
+- implemented traceability links (`source_feature_id`, `is_generated_task`, `generated_from_sprint_id`) between generated task tickets, source feature records, and the sprint.
+- updated Kanban drag/drop client behavior to send backend-validated payload keys (`column`, `position`, `view` and `column`, `tickets`, `view`) and removed old/invalid payload keys (`status`, `ticket_ids`).
+- improved Sortable initialization lifecycle for visible-only columns and force reinitialization support.
+- improved drag feedback classes/flow to preserve card drag ghost/shadow/cursor states.
+
+### Root cause fixed (Kanban)
+- root cause confirmed: frontend JS payload keys did not match `KanbanController` request validation contract.
+- fixed frontend request payload contracts for move + reorder to exactly match backend requirements.
+
+### Tests/checks run
+- updated sprint workflow feature test for feature->generated task conversion traceability.
+- updated Kanban workflow feature tests for task-style board movement and validation failures on legacy key names.
+
+### Known remaining issues
+- artisan/phpunit execution remains environment-dependent when Composer `vendor/` is unavailable in the container.
+- planned-sprint pre-start UI actions (explicit add/remove/approve routes) are partially represented by existing `next_sprint` queue flow and should be expanded in a subsequent pass.
+
+### Next planned task
+Production hardening and deployment preparation.

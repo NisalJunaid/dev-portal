@@ -35,6 +35,9 @@ return new class extends Migration
             $table->integer('timeline_position')->nullable();
             $table->foreignId('parent_ticket_id')->nullable()->constrained('tickets')->nullOnDelete();
             $table->foreignId('depends_on_ticket_id')->nullable()->constrained('tickets')->nullOnDelete();
+            $table->foreignId('source_feature_id')->nullable()->constrained('tickets')->nullOnDelete();
+            $table->boolean('is_generated_task')->default(false);
+            $table->unsignedBigInteger('generated_from_sprint_id')->nullable();
             $table->timestamps();
         });
     }

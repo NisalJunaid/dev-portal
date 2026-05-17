@@ -67,6 +67,24 @@ class Sprint extends Model
         return $this->belongsToMany(Ticket::class, 'sprint_items')->withPivot('position')->withTimestamps()->orderByPivot('position');
     }
 
+
+    public function tasks(): BelongsToMany
+    {
+        return $this->tickets()->where(function ($query) {
+            $query->where('tickets.is_generated_task', true)->orWhere('tickets.type', Ticket::TYPE_TASK);
+        });
+    }
+
+    public function bugs(): BelongsToMany
+    {
+        return $this->tickets()->where('tickets.type', Ticket::TYPE_BUG);
+    }
+
+    public function sourceFeatures(): BelongsToMany
+    {
+        return $this->tickets()->where('tickets.type', Ticket::TYPE_FEATURE);
+    }
+
     public function activities(): HasMany
     {
         return $this->hasMany(SprintActivity::class)->latest();

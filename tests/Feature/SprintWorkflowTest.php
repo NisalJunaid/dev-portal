@@ -37,13 +37,15 @@ class SprintWorkflowTest extends TestCase
         $this->assertSame(Sprint::STATUS_IN_PROGRESS, $sprint->status);
         $this->assertNotNull($sprint->started_at);
         $this->assertSame($manager->id, $sprint->started_by);
-        $this->assertSame(Ticket::STATUS_IN_PROGRESS, $firstFeature->refresh()->status);
-        $this->assertSame(Ticket::STATUS_IN_PROGRESS, $secondFeature->refresh()->status);
+        $this->assertSame(Ticket::STATUS_NEXT_SPRINT, $firstFeature->refresh()->status);
+        $this->assertSame(Ticket::STATUS_NEXT_SPRINT, $secondFeature->refresh()->status);
         $this->assertSame(Ticket::STATUS_RECOMMENDED, $recommendedFeature->refresh()->status);
-        $this->assertDatabaseHas('sprint_items', ['sprint_id' => $sprint->id, 'ticket_id' => $firstFeature->id, 'position' => 1]);
-        $this->assertDatabaseHas('sprint_items', ['sprint_id' => $sprint->id, 'ticket_id' => $secondFeature->id, 'position' => 2]);
+        $generatedTasks = Ticket::where('is_generated_task', true)->where('generated_from_sprint_id', $sprint->id)->get();
+        $this->assertCount(2, $generatedTasks);
+        $this->assertTrue($generatedTasks->pluck('source_feature_id')->contains($firstFeature->id));
+        $this->assertTrue($generatedTasks->pluck('source_feature_id')->contains($secondFeature->id));
         $this->assertDatabaseHas('sprint_activities', ['sprint_id' => $sprint->id, 'user_id' => $manager->id, 'action' => 'started']);
-        $this->assertDatabaseHas('ticket_activities', ['ticket_id' => $firstFeature->id, 'user_id' => $manager->id, 'action' => 'sprint started', 'old_value' => Ticket::STATUS_NEXT_SPRINT, 'new_value' => Ticket::STATUS_IN_PROGRESS]);
+        $this->assertDatabaseHas('ticket_activities', ['ticket_id' => $firstFeature->id, 'user_id' => $manager->id, 'action' => 'converted to task for sprint']);
     }
 
     public function test_kiel_user_can_complete_sprint_and_review_analytics(): void

@@ -265,47 +265,60 @@ const updateKanbanEmptyStates = (board) => board.querySelectorAll('[data-kanban-
     if (count) count.textContent = c.querySelectorAll('[data-kanban-card]').length;
 });
 
+const handleKanbanDrop = async (board, evt) => {
+    const card = evt.item;
+    const sourceColumn = evt.from.dataset.column;
+    const destinationColumn = evt.to.dataset.column;
+    const boardView = board.dataset.view || 'all';
+    const movedAcrossColumns = sourceColumn !== destinationColumn;
+    const destinationIds = Array.from(evt.to.querySelectorAll('[data-kanban-card]')).map((el) => Number(el.dataset.ticketId));
+    const sourceIds = Array.from(evt.from.querySelectorAll('[data-kanban-card]')).map((el) => Number(el.dataset.ticketId));
+    const insertBack = () => {
+        if (typeof evt.oldIndex !== 'number') return window.location.reload();
+        const siblings = evt.from.querySelectorAll('[data-kanban-card]');
+        const ref = siblings[evt.oldIndex] || null;
+        evt.from.insertBefore(card, ref);
+    };
+    try {
+        if (movedAcrossColumns) {
+            const payload = await window.Kiel.request(card.dataset.moveUrl, { method: 'PATCH', body: JSON.stringify({ column: destinationColumn, position: evt.newIndex ?? 0, view: boardView }) });
+            if (payload?.ticket?.column) card.dataset.currentColumn = payload.ticket.column;
+        }
+        await window.Kiel.request(board.dataset.reorderUrl, { method: 'PATCH', body: JSON.stringify({ column: destinationColumn, tickets: destinationIds, view: boardView }) });
+        if (movedAcrossColumns && sourceIds.length > 0) {
+            await window.Kiel.request(board.dataset.reorderUrl, { method: 'PATCH', body: JSON.stringify({ column: sourceColumn, tickets: sourceIds, view: boardView }) });
+        }
+        updateKanbanEmptyStates(board);
+        window.Kiel.toast('Task moved.', 'success');
+    } catch (error) {
+        window.Kiel.toast(error.message || 'Unable to move ticket.', 'error');
+        insertBack();
+        updateKanbanEmptyStates(board);
+    }
+};
+
 window.KielKanban = {
     async initAll(force = false) {
         await loadSortable().catch(() => window.Kiel.toast('Kanban library failed to load.', 'error'));
         document.querySelectorAll('[data-kanban-board]').forEach((board) => {
             if (board.dataset.canMove !== 'true' || !window.Sortable) return;
-            const visible = window.getComputedStyle(board).display !== 'none';
-            if (!visible) return;
-            let initializedAny = false;
             board.querySelectorAll('[data-kanban-column]').forEach((column) => {
-                if (!force && column.dataset.sortableInitialized === '1') return;
-                window.Sortable.create(column, {
-                    group: `kiel-kanban-${board.dataset.view || 'all'}`, animation: 150, draggable: '[data-kanban-card]', handle: '[data-kanban-drag-handle]', ghostClass: 'opacity-60', chosenClass: 'ring-2 ring-indigo-300',
-                    onEnd: async (evt) => {
-                        const card = evt.item; const boardView = board.dataset.view || 'all';
-                        const ticketId = card.dataset.ticketId;
-                        const oldColumn = evt.from;
-                        const newColumn = evt.to;
-                        const column = newColumn.dataset.column;
-                        const ordered = Array.from(newColumn.querySelectorAll('[data-kanban-card]')).map((el) => Number(el.dataset.ticketId));
-                        const sourceOrdered = Array.from(oldColumn.querySelectorAll('[data-kanban-card]')).map((el) => Number(el.dataset.ticketId));
-                        const movedAcross = oldColumn !== newColumn;
-                        try {
-                            if (movedAcross) {
-                                await window.Kiel.request(card.dataset.moveUrl, { method: 'PATCH', body: JSON.stringify({ column, position: evt.newIndex, view: boardView }) });
-                            }
-                            await window.Kiel.request(board.dataset.reorderUrl, { method: 'PATCH', body: JSON.stringify({ column, tickets: ordered, view: boardView }) });
-                            if (movedAcross && sourceOrdered.length) {
-                                await window.Kiel.request(board.dataset.reorderUrl, { method: 'PATCH', body: JSON.stringify({ column: oldColumn.dataset.column, tickets: sourceOrdered, view: boardView }) });
-                            }
-                            card.dataset.currentColumn = column;
-                            updateKanbanEmptyStates(board); window.Kiel.toast(`Task moved.`, 'success');
-                        } catch (error) {
-                            window.Kiel.toast(error.message || 'Unable to move ticket.', 'error');
-                            window.location.reload();
-                        }
-                    },
+                if (!column.offsetParent) return;
+                if (force && column._kielSortable) {
+                    column._kielSortable.destroy();
+                    column._kielSortable = null;
+                    column.dataset.sortableInitialized = '0';
+                }
+                if (column.dataset.sortableInitialized === '1') return;
+                column._kielSortable = window.Sortable.create(column, {
+                    group: `kiel-kanban-${board.dataset.view || 'all'}`, animation: 180, draggable: '[data-kanban-card]', handle: '[data-kanban-drag-handle]',
+                    ghostClass: 'kanban-card-ghost', chosenClass: 'kanban-card-chosen', dragClass: 'kanban-card-drag',
+                    fallbackOnBody: true, forceFallback: false, swapThreshold: 0.65, emptyInsertThreshold: 24,
+                    onStart: (evt) => { evt.item.classList.add('is-dragging'); document.body.classList.add('is-kanban-dragging'); },
+                    onEnd: (evt) => { evt.item.classList.remove('is-dragging'); document.body.classList.remove('is-kanban-dragging'); handleKanbanDrop(board, evt); },
                 });
                 column.dataset.sortableInitialized = '1';
-                initializedAny = true;
             });
-            if (initializedAny) board.dataset.kanbanInitialized = '1';
             updateKanbanEmptyStates(board);
         });
     },
