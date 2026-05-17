@@ -28,8 +28,8 @@ Route::middleware('auth')->group(function () {
     Route::resource('softwares', SoftwareController::class)->only(['index', 'create', 'store', 'edit', 'update']);
 
     Route::get('/tasks', [TaskWorkspaceController::class, 'index'])->name('tasks.index');
-    Route::get('/kanban', [KanbanController::class, 'index'])->name('kanban.index');
-    Route::get('/timeline', [TimelineController::class, 'index'])->name('timeline.index');
+    Route::get('/kanban', fn () => redirect()->route('tasks.index', ['view' => 'board']))->name('kanban.index');
+    Route::get('/timeline', fn () => redirect()->route('tasks.index', ['view' => 'timeline']))->name('timeline.index');
     Route::get('/timeline/data', [TimelineController::class, 'data'])->name('timeline.data');
     Route::patch('/timeline/tasks/{ticket}/dates', [TimelineController::class, 'dates'])->name('timeline.tasks.dates');
     Route::patch('/timeline/tasks/{ticket}/dependency', [TimelineController::class, 'dependency'])->name('timeline.tasks.dependency');
@@ -49,7 +49,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/tickets/{ticket}/timer/pause', [TimeTrackingController::class, 'pause'])->name('tickets.timer.pause');
     Route::post('/tickets/{ticket}/timer/resume', [TimeTrackingController::class, 'resume'])->name('tickets.timer.resume');
     Route::post('/tickets/{ticket}/timer/stop', [TimeTrackingController::class, 'stop'])->name('tickets.timer.stop');
-    Route::resource('tickets', TicketController::class)->only(['index', 'create', 'store', 'show', 'update']);
+    Route::get('/tickets', fn () => redirect()->route('tasks.index', ['view' => 'list']))->name('tickets.index');
+    Route::resource('tickets', TicketController::class)->only(['create', 'store', 'show', 'update']);
 
     Route::get('/bugs', [BugController::class, 'index'])->name('bugs.index');
     Route::get('/bugs/{ticket}', [BugController::class, 'show'])->name('bugs.show');

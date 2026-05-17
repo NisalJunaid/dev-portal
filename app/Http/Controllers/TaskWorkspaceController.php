@@ -26,7 +26,7 @@ class TaskWorkspaceController extends Controller
         abort_unless($request->user()->can('view tickets'), 403);
 
         $validated = $request->validate([
-            'view' => ['nullable', Rule::in(['list', 'board', 'timeline'])],
+            'view' => ['nullable', 'string'],
             'search' => ['nullable', 'string', 'max:255'],
             'type' => ['nullable', Rule::in(Ticket::TYPES)],
             'urgency' => ['nullable', Rule::in(Ticket::URGENCIES)],
@@ -42,7 +42,9 @@ class TaskWorkspaceController extends Controller
 
         $sort = $validated['sort'] ?? 'updated_at';
         $direction = $validated['direction'] ?? 'desc';
-        $activeView = $validated['view'] ?? 'list';
+        $activeView = in_array($validated['view'] ?? 'list', ['list', 'board', 'timeline'], true)
+            ? $validated['view']
+            : 'list';
 
         $ticketsQuery = Ticket::query()
             ->visibleTo($request->user())

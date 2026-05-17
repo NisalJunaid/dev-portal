@@ -1,15 +1,19 @@
 @php
+    $tasksActive = request()->routeIs('tasks.*')
+        || request()->routeIs('tickets.*')
+        || request()->routeIs('kanban.*')
+        || request()->routeIs('timeline.*')
+        || request()->routeIs('bugs.*')
+        || request()->routeIs('features.*');
+
     $menuItems = [
-        ['label' => 'Dashboard', 'route' => 'dashboard', 'permission' => null, 'icon' => 'grid'],
-        ['label' => 'Tickets', 'route' => 'tickets.index', 'permission' => 'view tickets', 'icon' => 'ticket'],
-        ['label' => 'Bugs', 'route' => 'bugs.index', 'permission' => 'view bugs', 'icon' => 'bug'],
-        ['label' => 'Features', 'route' => 'features.index', 'permission' => 'view features', 'icon' => 'sparkles'],
-        ['label' => 'Sprints', 'route' => 'sprints.index', 'permission' => 'view sprints', 'icon' => 'calendar'],
-        ['label' => 'Timeline', 'route' => 'timeline.index', 'permission' => 'view timeline', 'icon' => 'timeline'],
-        ['label' => 'Reports', 'route' => 'reports.index', 'permission' => 'view reports', 'icon' => 'chart'],
-        ['label' => 'Clients', 'route' => 'clients.index', 'permission' => 'view clients', 'icon' => 'building'],
-        ['label' => 'Software', 'route' => 'softwares.index', 'permission' => 'view software', 'icon' => 'cube'],
-        ['label' => 'Settings', 'route' => 'settings.index', 'permission' => 'view settings', 'icon' => 'cog'],
+        ['label' => 'Dashboard', 'route' => 'dashboard', 'permission' => null, 'icon' => 'D', 'active' => request()->routeIs('dashboard')],
+        ['label' => 'Tasks', 'route' => 'tasks.index', 'permission' => 'view tickets', 'icon' => 'T', 'active' => $tasksActive],
+        ['label' => 'Sprints', 'route' => 'sprints.index', 'permission' => 'view sprints', 'icon' => 'S', 'active' => request()->routeIs('sprints.*')],
+        ['label' => 'Reports', 'route' => 'reports.index', 'permission' => 'view reports', 'icon' => 'R', 'active' => request()->routeIs('reports.*')],
+        ['label' => 'Clients', 'route' => 'clients.index', 'permission' => 'view clients', 'icon' => 'C', 'active' => request()->routeIs('clients.*')],
+        ['label' => 'Software', 'route' => 'softwares.index', 'permission' => 'view software', 'icon' => 'SW', 'active' => request()->routeIs('softwares.*')],
+        ['label' => 'Settings', 'route' => 'settings.index', 'permission' => 'view settings', 'icon' => '⚙', 'active' => request()->routeIs('settings.*')],
     ];
 @endphp
 <!DOCTYPE html>
@@ -22,31 +26,47 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body>
-    <div x-data="{ sidebarOpen: false }" class="min-h-screen bg-slate-50">
+    <div
+        x-data="appShell()"
+        x-init="initShell()"
+        class="min-h-screen bg-slate-50"
+        :style="shellStyle()"
+    >
         <div x-show="sidebarOpen" x-transition.opacity class="fixed inset-0 z-30 bg-slate-950/40 lg:hidden" @click="sidebarOpen = false"></div>
 
-        <aside class="fixed inset-y-0 left-0 z-40 w-72 -translate-x-full border-r border-slate-200 bg-slate-100/95 px-4 py-5 transition duration-200 ease-out lg:translate-x-0" :class="{ 'translate-x-0': sidebarOpen }">
-            <div class="flex items-center gap-3 px-2">
-                <x-application-logo class="h-11 w-11" />
-                <div>
-                    <p class="text-sm font-black uppercase tracking-[0.25em] text-indigo-600">Kiel</p>
-                    <p class="text-lg font-black text-slate-950">Dev Portal</p>
+        <aside
+            class="fixed inset-y-0 left-0 z-40 -translate-x-full border-r border-slate-200 bg-slate-100/95 px-4 py-5 transition duration-200 ease-out lg:translate-x-0"
+            :class="{ 'translate-x-0': sidebarOpen }"
+            :style="sidebarStyle()"
+        >
+            <div class="flex items-center justify-between px-2">
+                <div class="flex items-center gap-3 overflow-hidden">
+                    <x-application-logo class="h-11 w-11 shrink-0" />
+                    <div x-show="!sidebarCollapsed" x-transition.opacity>
+                        <p class="text-sm font-black uppercase tracking-[0.25em] text-indigo-600">Kiel</p>
+                        <p class="text-lg font-black text-slate-950">Dev Portal</p>
+                    </div>
                 </div>
+                <button type="button" class="hidden rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-bold text-slate-600 lg:inline-flex" @click="toggleCollapsed">
+                    <span x-text="sidebarCollapsed ? '→' : '←'"></span>
+                </button>
             </div>
 
             <nav class="mt-8 space-y-1">
                 @foreach ($menuItems as $item)
                     @if ($item['permission'] === null || auth()->user()->can($item['permission']))
-                        <a href="{{ route($item['route']) }}" @class(['app-shell-link', 'app-shell-link-active' => request()->routeIs($item['route']) || request()->routeIs(str($item['route'])->before('.index').'.*')])>
-                            <span class="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-200/80 text-xs font-black text-slate-500">{{ mb_substr($item['label'], 0, 1) }}</span>
-                            <span>{{ $item['label'] }}</span>
+                        <a href="{{ route($item['route']) }}" @class(['app-shell-link', 'app-shell-link-active' => $item['active']])>
+                            <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-slate-200/80 text-xs font-black text-slate-500">{{ $item['icon'] }}</span>
+                            <span x-show="!sidebarCollapsed" x-transition.opacity>{{ $item['label'] }}</span>
                         </a>
                     @endif
                 @endforeach
             </nav>
+
+            <div class="absolute right-0 top-0 hidden h-full w-1 cursor-col-resize bg-transparent hover:bg-indigo-200 lg:block" @mousedown.prevent="startResize"></div>
         </aside>
 
-        <div class="lg:pl-72">
+        <div :style="contentStyle()">
             <header class="sticky top-0 z-20 border-b border-slate-200 bg-slate-50/85 backdrop-blur">
                 <div class="flex h-20 items-center justify-between px-4 sm:px-6 lg:px-8">
                     <div class="flex items-center gap-4">
@@ -78,5 +98,61 @@
             </main>
         </div>
     </div>
+
+    <script>
+        function appShell() {
+            return {
+                sidebarOpen: false,
+                sidebarCollapsed: false,
+                sidebarWidth: 288,
+                sidebarMinWidth: 220,
+                sidebarMaxWidth: 420,
+                collapsedWidth: 80,
+                isResizing: false,
+                initShell() {
+                    this.sidebarCollapsed = localStorage.getItem('kiel.sidebar.collapsed') === '1';
+                    const savedWidth = Number.parseInt(localStorage.getItem('kiel.sidebar.width') || '', 10);
+                    if (!Number.isNaN(savedWidth)) {
+                        this.sidebarWidth = this.clampWidth(savedWidth);
+                    }
+                },
+                clampWidth(width) {
+                    return Math.min(this.sidebarMaxWidth, Math.max(this.sidebarMinWidth, width));
+                },
+                shellStyle() {
+                    const width = this.sidebarCollapsed ? this.collapsedWidth : this.sidebarWidth;
+                    return `--sidebar-width: ${width}px; --content-left: ${width}px;`;
+                },
+                sidebarStyle() {
+                    return `width: var(--sidebar-width);`;
+                },
+                contentStyle() {
+                    return `padding-left: var(--content-left);`;
+                },
+                toggleCollapsed() {
+                    this.sidebarCollapsed = !this.sidebarCollapsed;
+                    localStorage.setItem('kiel.sidebar.collapsed', this.sidebarCollapsed ? '1' : '0');
+                },
+                startResize(event) {
+                    if (this.sidebarCollapsed) return;
+                    this.isResizing = true;
+                    document.body.classList.add('select-none');
+                    const onMove = (moveEvent) => {
+                        if (!this.isResizing) return;
+                        this.sidebarWidth = this.clampWidth(moveEvent.clientX);
+                    };
+                    const onUp = () => {
+                        this.isResizing = false;
+                        localStorage.setItem('kiel.sidebar.width', String(this.sidebarWidth));
+                        document.body.classList.remove('select-none');
+                        window.removeEventListener('mousemove', onMove);
+                        window.removeEventListener('mouseup', onUp);
+                    };
+                    window.addEventListener('mousemove', onMove);
+                    window.addEventListener('mouseup', onUp);
+                },
+            };
+        }
+    </script>
 </body>
 </html>
