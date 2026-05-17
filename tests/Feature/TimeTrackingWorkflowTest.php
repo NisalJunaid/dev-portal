@@ -149,7 +149,7 @@ class TimeTrackingWorkflowTest extends TestCase
         $this->actingAs($developer)->postJson(route('tickets.timer.start', $ticket))->assertOk();
 
         Carbon::setTestNow('2026-05-17 11:03:20');
-        $this->actingAs($developer)->post(route('bugs.block', $ticket))->assertRedirect();
+        $this->actingAs($developer)->post(route('bugs.block', $ticket), ['reason' => 'External dependency.'])->assertRedirect();
 
         $timeLog = TimeLog::firstOrFail();
 

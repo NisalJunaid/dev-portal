@@ -8,6 +8,7 @@ use App\Http\Controllers\App\PageController;
 use App\Http\Controllers\SoftwareController;
 use App\Http\Controllers\SprintController;
 use App\Http\Controllers\TicketController;
+use App\Http\Controllers\TicketBlockController;
 use App\Http\Controllers\TimeTrackingController;
 use Illuminate\Support\Facades\Route;
 
@@ -27,6 +28,8 @@ Route::middleware('auth')->group(function () {
     Route::patch('/tickets/{ticket}/reject', [TicketController::class, 'reject'])->name('tickets.reject');
     Route::patch('/tickets/{ticket}/assign', [TicketController::class, 'assign'])->name('tickets.assign');
     Route::post('/tickets/{ticket}/comments', [TicketController::class, 'comment'])->name('tickets.comments.store');
+    Route::post('/tickets/{ticket}/block', [TicketBlockController::class, 'block'])->name('tickets.block');
+    Route::post('/tickets/{ticket}/unblock', [TicketBlockController::class, 'unblock'])->name('tickets.unblock');
     Route::post('/tickets/{ticket}/timer/start', [TimeTrackingController::class, 'start'])->name('tickets.timer.start');
     Route::post('/tickets/{ticket}/timer/pause', [TimeTrackingController::class, 'pause'])->name('tickets.timer.pause');
     Route::post('/tickets/{ticket}/timer/resume', [TimeTrackingController::class, 'resume'])->name('tickets.timer.resume');

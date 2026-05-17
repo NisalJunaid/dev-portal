@@ -91,6 +91,16 @@ class User extends Authenticatable
         return $this->hasMany(TimeLog::class);
     }
 
+    public function blockedTickets(): HasMany
+    {
+        return $this->hasMany(TicketBlock::class, 'blocked_by');
+    }
+
+    public function unblockedTickets(): HasMany
+    {
+        return $this->hasMany(TicketBlock::class, 'unblocked_by');
+    }
+
     public function ticketComments(): HasMany
     {
         return $this->hasMany(TicketComment::class);

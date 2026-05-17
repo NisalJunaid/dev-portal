@@ -7,6 +7,7 @@ use App\Models\Ticket;
 use App\Models\TicketComment;
 use App\Models\User;
 use App\Services\TicketActivityService;
+use App\Services\TicketBlockService;
 use App\Services\TicketNumberService;
 use App\Services\TimeTrackingService;
 use Illuminate\Contracts\View\View;
@@ -14,6 +15,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class TicketController extends Controller
 {
@@ -21,6 +23,7 @@ class TicketController extends Controller
         private readonly TicketNumberService $ticketNumberService,
         private readonly TicketActivityService $ticketActivityService,
         private readonly TimeTrackingService $timeTrackingService,
+        private readonly TicketBlockService $ticketBlockService,
     ) {
     }
 
@@ -101,7 +104,7 @@ class TicketController extends Controller
     {
         $this->authorizeTicketAccess($request, $ticket);
 
-        $ticket->load(['client', 'software', 'submitter', 'assignee', 'activities.user']);
+        $ticket->load(['client', 'software', 'submitter', 'assignee', 'activities.user', 'activeBlock.blocker']);
         $comments = $this->visibleComments($request, $ticket);
         $currentTimer = $request->user()->isKielUser()
             ? $this->timeTrackingService->activeTimerFor($ticket, $request->user())->latest()->first()
@@ -109,6 +112,10 @@ class TicketController extends Controller
         $cumulativeDuration = $request->user()->isKielUser()
             ? $this->timeTrackingService->cumulativeDurationForTicket($ticket)
             : null;
+        $blockHistory = $request->user()->isKielUser()
+            ? $ticket->blocks()->with(['blocker', 'unblocker'])->latest('blocked_at')->get()
+            : collect();
+        $totalBlockedDuration = $this->ticketBlockService->totalBlockedDurationForTicket($ticket);
 
         return view('tickets.show', [
             'ticket' => $ticket,
@@ -118,6 +125,9 @@ class TicketController extends Controller
             'isKielUser' => $request->user()->isKielUser(),
             'currentTimer' => $currentTimer,
             'cumulativeDuration' => $cumulativeDuration,
+            'activeBlock' => $ticket->activeBlock,
+            'blockHistory' => $blockHistory,
+            'totalBlockedDuration' => $totalBlockedDuration,
         ]);
     }
 
@@ -206,6 +216,12 @@ class TicketController extends Controller
 
         $software = Software::findOrFail($validated['software_id']);
         $oldValues = $ticket->only(['software_id', 'urgency', 'assigned_to', 'status', 'start_date', 'due_date', 'estimated_hours']);
+
+        if (in_array($validated['status'], [Ticket::STATUS_BUG_BLOCKED, Ticket::STATUS_FEATURE_BLOCKED], true) && ! $ticket->isBlocked()) {
+            throw ValidationException::withMessages([
+                'status' => 'Use the Block button and provide a reason to block tickets.',
+            ]);
+        }
 
         $updates = [
             'client_id' => $software->client_id,

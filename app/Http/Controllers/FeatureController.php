@@ -8,6 +8,7 @@ use App\Models\Ticket;
 use App\Models\TicketComment;
 use App\Models\User;
 use App\Services\TicketActivityService;
+use App\Services\TicketBlockService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -17,8 +18,10 @@ use Symfony\Component\HttpFoundation\Response;
 
 class FeatureController extends Controller
 {
-    public function __construct(private readonly TicketActivityService $ticketActivityService)
-    {
+    public function __construct(
+        private readonly TicketActivityService $ticketActivityService,
+        private readonly TicketBlockService $ticketBlockService,
+    ) {
     }
 
     public function index(Request $request): View
@@ -81,7 +84,7 @@ class FeatureController extends Controller
     {
         $this->authorizeFeatureAccess($request, $ticket);
 
-        $ticket->load(['client', 'software', 'submitter', 'assignee', 'activities.user']);
+        $ticket->load(['client', 'software', 'submitter', 'assignee', 'activities.user', 'activeBlock.blocker']);
 
         return view('features.show', [
             'ticket' => $ticket,
@@ -89,6 +92,8 @@ class FeatureController extends Controller
             'teamMembers' => $this->teamMembers(),
             'softwares' => Software::with('client')->where('is_enabled', true)->orderBy('name')->get(),
             'isKielUser' => $request->user()->isKielUser(),
+            'activeBlock' => $ticket->activeBlock,
+            'totalBlockedDuration' => $this->ticketBlockService->totalBlockedDurationForTicket($ticket),
         ]);
     }
 
@@ -145,6 +150,7 @@ class FeatureController extends Controller
     public function complete(Request $request, Ticket $ticket): RedirectResponse
     {
         $this->authorizeKielFeatureAccess($request, $ticket);
+        abort_if($ticket->isBlocked(), Response::HTTP_UNPROCESSABLE_ENTITY, 'Use the Unblock button and provide a note before completing blocked features.');
 
         $oldStatus = $ticket->status;
 
