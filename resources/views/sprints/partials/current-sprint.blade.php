@@ -7,15 +7,15 @@
     <span class="badge badge-status mt-2">{{ str($currentSprint->status)->headline() }}</span>
   </div>
   <div class="text-2xl font-black" x-text="formattedTimer"></div>
-  <div class="grid grid-cols-3 gap-2 text-xs">
+  <div class="grid grid-cols-4 gap-2 text-xs">
     <div>Total: {{ $currentSprintStats['total_tasks'] ?? 0 }}</div><div>Backlog: {{ $currentSprintStats['backlog_tasks'] ?? 0 }}</div><div>In Progress: {{ $currentSprintStats['in_progress_tasks'] ?? 0 }}</div>
-    <div>Blocked: {{ $currentSprintStats['blocked_tasks'] ?? 0 }}</div><div>Completed: {{ $currentSprintStats['completed_tasks'] ?? 0 }}</div><div>Remaining: {{ $currentSprintStats['remaining_tasks'] ?? 0 }}</div>
+    <div>Blocked: {{ $currentSprintStats['blocked_tasks'] ?? 0 }}</div><div>Completed: {{ $currentSprintStats['completed_tasks'] ?? 0 }}</div><div>Rejected: {{ $currentSprintStats['rejected_tasks'] ?? 0 }}</div><div>Remaining: {{ $currentSprintStats['remaining_tasks'] ?? 0 }}</div>
   </div>
   @if($isKielUser)
   <div class="flex gap-2">
     <button class="sprint-icon-button" x-show="running" @click="pauseSprint({{ $currentSprint->id }})" title="Pause sprint">▮▮<span class="sr-only">Pause sprint</span></button>
     <button class="sprint-icon-button" x-show="!running" @click="resumeSprint({{ $currentSprint->id }})" title="Resume sprint">▶<span class="sr-only">Resume sprint</span></button>
-    <button class="sprint-icon-button" @click="endSprint({{ $currentSprint->id }})" title="End sprint">■<span class="sr-only">End sprint</span></button>
+    <button class="sprint-icon-button" @click="endSprint({{ $currentSprint->id }})" @disabled(!($currentSprintStats['can_end'] ?? false)) title="{{ ($currentSprintStats['can_end'] ?? false) ? 'End sprint' : 'All sprint tasks must be completed, rejected, or blocked before ending.' }}">■<span class="sr-only">End sprint</span></button>
   </div>
   @endif
 </div>

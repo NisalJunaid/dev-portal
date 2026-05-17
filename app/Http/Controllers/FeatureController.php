@@ -15,6 +15,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\Response;
 
 class FeatureController extends Controller
@@ -167,7 +168,19 @@ class FeatureController extends Controller
     public function removeFromSprint(Request $request, Ticket $ticket): JsonResponse|RedirectResponse
     {
         $this->authorizeKielFeatureAccess($request, $ticket);
-        abort_unless($ticket->status === Ticket::STATUS_NEXT_SPRINT, Response::HTTP_UNPROCESSABLE_ENTITY, 'Only next sprint features can be removed.');
+        if ($ticket->status !== Ticket::STATUS_NEXT_SPRINT) {
+            throw ValidationException::withMessages(['feature' => 'Only next sprint features can be removed.']);
+        }
+
+        $hasGeneratedSprintTask = $ticket->generatedTasks()->whereNotNull('generated_from_sprint_id')->exists();
+        if ($hasGeneratedSprintTask) {
+            $message = 'This feature has already been converted into sprint task(s) and cannot be removed from sprint approval.';
+            if ($request->expectsJson()) {
+                return response()->json(['message' => $message], 422);
+            }
+
+            throw ValidationException::withMessages(['feature' => $message]);
+        }
 
         $oldStatus = $ticket->status;
         $newStatus = Ticket::STATUS_FEATURE_APPROVED;

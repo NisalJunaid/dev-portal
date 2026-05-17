@@ -453,3 +453,31 @@ Production hardening and deployment preparation.
 
 ### Next planned task
 Production hardening and deployment preparation.
+
+## Completed: Sprint lifecycle enforcement + Sprints planning lock-down
+
+### Summary
+- Added explicit sprint terminal-state helpers on Ticket model and generated sprint task helper.
+- Enforced backend sprint end rule: a sprint can only end when all sprint items are terminal (completed/rejected/blocked).
+- Locked converted feature requests so they cannot be removed from sprint approval once generated sprint task(s) exist.
+- Updated Sprints page stats and controls to expose active-count/can-end behavior and disable end when active items remain.
+- Updated approved sprint features table to show converted items as read-only badge.
+
+### Rules implemented
+- Converted sprint features are locked after sprint start.
+- Remove approval switch is hidden/disabled for converted sprint items.
+- Backend `removeFromSprint` guard added to block converted items.
+- Sprint can only end when all items are completed/rejected/blocked.
+- Completed sprint items remain available in sprint detail pages and task-level filtering workflows.
+
+### Tests/checks run
+- `php artisan test`
+- `php artisan route:list`
+- `php artisan view:clear`
+- `php artisan optimize:clear`
+
+### Known issues
+- If vendor dependencies are not present in this container, artisan/test commands may fail before Laravel boots.
+
+### Next planned task
+Production hardening and deployment preparation.
