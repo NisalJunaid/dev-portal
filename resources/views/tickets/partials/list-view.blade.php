@@ -148,7 +148,7 @@
                             })"
                         >
                             <td class="whitespace-nowrap px-4 py-4 align-top">
-                                <a href="{{ route('tickets.show', $ticket) }}" class="font-black text-slate-950 transition hover:text-indigo-700">{{ $ticket->ticket_no }}</a>
+                                <a href="{{ route('tickets.show', $ticket) }}" data-ticket-drawer-url="{{ route('tickets.drawer', $ticket) }}" class="font-black text-slate-950 transition hover:text-indigo-700">{{ $ticket->ticket_no }}</a>
                             </td>
                             <td class="min-w-72 px-4 py-3 align-top">
                                 @if ($isKielUser)
@@ -158,7 +158,7 @@
                                     </div>
                                     <p x-show="errors.title" x-text="errors.title" class="mt-1 text-xs font-bold text-rose-600"></p>
                                 @else
-                                    <a href="{{ route('tickets.show', $ticket) }}" class="font-bold text-slate-800 hover:text-indigo-700">{{ $ticket->title }}</a>
+                                    <a href="{{ route('tickets.show', $ticket) }}" data-ticket-drawer-url="{{ route('tickets.drawer', $ticket) }}" class="font-bold text-slate-800 hover:text-indigo-700">{{ $ticket->title }}</a>
                                 @endif
                             </td>
                             <td class="whitespace-nowrap px-4 py-4 align-top font-bold text-slate-600">{{ str($ticket->type ?? 'unclassified')->headline() }}</td>

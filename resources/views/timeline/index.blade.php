@@ -19,6 +19,7 @@
             dataUrl: @js(route('timeline.data')),
             dateUrlTemplate: @js(route('timeline.tasks.dates', ['ticket' => '__TICKET__'])),
             dependencyUrlTemplate: @js(route('timeline.tasks.dependency', ['ticket' => '__TICKET__'])),
+            drawerUrlTemplate: @js(route('tickets.drawer', ['ticket' => '__TICKET__'])),
             ticketOptions: [],
             canEdit: @js($canEdit),
         })"
@@ -186,12 +187,15 @@
         <button type="button" x-show="drawerOpen" x-transition.opacity class="fixed inset-0 z-40 bg-slate-950/30" @click="closeDrawer" aria-label="Close timeline drawer"></button>
     </div>
 
+    @include('tickets.partials.drawer')
+
     <script>
         function timelineView(config) {
             return {
                 dataUrl: config.dataUrl,
                 dateUrlTemplate: config.dateUrlTemplate,
                 dependencyUrlTemplate: config.dependencyUrlTemplate,
+                drawerUrlTemplate: config.drawerUrlTemplate,
                 canEdit: config.canEdit,
                 gantt: null,
                 tasks: [],
@@ -313,7 +317,8 @@
                 openDrawer(task) {
                     this.selectedTask = task;
                     this.dependencyDraft = task?.ticket?.dependency_id ? String(task.ticket.dependency_id) : '';
-                    this.drawerOpen = true;
+                    this.drawerOpen = false;
+                    window.ticketDrawer?.open(this.drawerUrlTemplate.replace('__TICKET__', task.id));
                 },
                 closeDrawer() {
                     this.drawerOpen = false;
