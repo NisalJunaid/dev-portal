@@ -189,3 +189,30 @@ Production hardening and deployment preparation.
 
 ### Next planned task
 Production hardening and deployment preparation.
+
+## Completed: Asana-like Tasks workspace panel + list table controls
+
+### Summary
+- added adjustable list table column widths via drag handles with persisted localStorage widths.
+- added show/hide column controls in the unified toolbar with persisted visibility preferences.
+- refined `/tasks` to a stable full-height workspace shell with compact toolbar/filter band and consistent content panel height across List/Board/Timeline.
+- removed rounded main task workspace containers in favor of flatter Asana-like panels while preserving existing inline row editing and drawer behavior.
+- added sleek hover scrollbars and subtle fade transitions for filters, columns menu, and view panel switching.
+
+### Files changed
+- `resources/views/tasks/index.blade.php`
+- `resources/views/tasks/partials/list-view.blade.php`
+- `resources/views/tasks/partials/kanban-view.blade.php`
+- `resources/views/tasks/partials/timeline-view.blade.php`
+- `resources/js/app.js`
+- `resources/css/app.css`
+- `docs/IMPLEMENTATION_TRACKER.md`
+
+### Tests/checks run
+- `php artisan view:clear`
+- `php artisan optimize:clear`
+- `php artisan route:list`
+- `php artisan test`
+
+### Next planned task
+Production hardening and deployment preparation.
