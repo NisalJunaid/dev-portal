@@ -132,12 +132,12 @@
                 <section class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
                     <h4 class="text-sm font-black uppercase tracking-[0.2em] text-slate-400">Block controls</h4>
                     <div class="mt-4 grid gap-3">
-                        @unless ($activeBlock)
+                        @if (! $activeBlock)
                             <form data-drawer-action-form="block" data-confirm-title="Block ticket?" data-confirm-message="Blocking highlights this ticket and pauses forward progress until it is unblocked." data-confirm-label="Block ticket" action="{{ route('tickets.block', $ticket) }}" class="space-y-3">
                                 <textarea name="reason" rows="3" class="w-full rounded-2xl border-slate-200 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" placeholder="Reason for blocking"></textarea>
                                 <button type="submit" class="rounded-2xl bg-rose-600 px-4 py-2 text-sm font-black text-white shadow-soft">Block ticket</button>
                             </form>
-                        @endunless
+                        @endif
                         @if ($activeBlock)
                             <form data-drawer-action-form="unblock" data-confirm-title="Unblock ticket?" data-confirm-message="This records the unblock note and returns the ticket to active workflow." data-confirm-label="Unblock ticket" action="{{ route('tickets.unblock', $ticket) }}" class="space-y-3 border-t border-slate-100 pt-3">
                                 <textarea name="unblock_note" rows="3" class="w-full rounded-2xl border-slate-200 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" placeholder="Unblock note"></textarea>
@@ -181,7 +181,9 @@
             </section>
         </div>
     </div>
-@else
+@endif
+
+@if ($mode !== 'content')
     <div data-global-ticket-drawer data-ticket-drawer data-timeline-drawer class="fixed inset-0 z-50 hidden" aria-hidden="true">
         <button type="button" data-ticket-drawer-backdrop class="absolute inset-0 bg-slate-950/40 opacity-0 transition-opacity duration-200" aria-label="Close task drawer"></button>
         <aside data-ticket-drawer-panel class="absolute inset-y-0 right-0 w-full max-w-2xl translate-x-full overflow-hidden border-l border-slate-200 bg-white shadow-2xl transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]">
