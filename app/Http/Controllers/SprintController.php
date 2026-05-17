@@ -80,8 +80,8 @@ class SprintController extends Controller
             'tickets' => fn ($query) => $query->with(['client', 'software', 'assignee'])->orderByPivot('position'),
         ]);
 
-        $completedTickets = $sprint->tickets->where('status', Ticket::STATUS_FEATURE_COMPLETED)->values();
-        $incompleteTickets = $sprint->tickets->reject(fn (Ticket $ticket) => $ticket->status === Ticket::STATUS_FEATURE_COMPLETED)->values();
+        $completedTickets = $sprint->tickets->filter(fn (Ticket $ticket) => in_array($ticket->status, [Ticket::STATUS_FEATURE_COMPLETED, Ticket::STATUS_BUG_COMPLETED], true))->values();
+        $incompleteTickets = $sprint->tickets->reject(fn (Ticket $ticket) => in_array($ticket->status, [Ticket::STATUS_FEATURE_COMPLETED, Ticket::STATUS_BUG_COMPLETED], true))->values();
         $ticketActivities = TicketActivity::query()
             ->with(['ticket', 'user'])
             ->whereIn('ticket_id', $sprint->tickets->pluck('id'))
@@ -122,7 +122,7 @@ class SprintController extends Controller
                 ]);
             }
 
-            $tickets = Ticket::query()
+            $featureTickets = Ticket::query()
                 ->where('client_id', $client->id)
                 ->where('type', Ticket::TYPE_FEATURE)
                 ->where('status', Ticket::STATUS_NEXT_SPRINT)
@@ -132,15 +132,25 @@ class SprintController extends Controller
                 ->lockForUpdate()
                 ->get();
 
-            if ($tickets->isEmpty()) {
+            $bugTickets = Ticket::query()
+                ->where('client_id', $client->id)
+                ->where('type', Ticket::TYPE_BUG)
+                ->whereIn('status', [Ticket::STATUS_BUG_PENDING, Ticket::STATUS_BUG_BLOCKED])
+                ->orderByRaw('priority_order is null')
+                ->orderBy('priority_order')
+                ->orderBy('created_at')
+                ->lockForUpdate()
+                ->get();
+
+            if ($featureTickets->isEmpty() && $bugTickets->isEmpty()) {
                 throw ValidationException::withMessages([
-                    'client_id' => 'No next sprint feature tickets are ready for this client.',
+                    'client_id' => 'No sprint-ready feature or bug tickets are ready for this client.',
                 ]);
             }
 
             $sprintNo = ((int) Sprint::query()->where('client_id', $client->id)->max('sprint_no')) + 1;
             $startedAt = now();
-            $softwareIds = $tickets->pluck('software_id')->filter()->unique()->values();
+            $softwareIds = $featureTickets->pluck('software_id')->merge($bugTickets->pluck('software_id'))->filter()->unique()->values();
 
             $sprint = Sprint::create([
                 'client_id' => $client->id,
@@ -155,25 +165,51 @@ class SprintController extends Controller
             $sprint->activities()->create([
                 'user_id' => $request->user()->id,
                 'action' => 'started',
-                'description' => 'Sprint started with '.$tickets->count().' next sprint feature '.str('ticket')->plural($tickets->count()).'.',
+                'description' => 'Sprint started with '.$featureTickets->count().' generated implementation tasks and '.$bugTickets->count().' bugs.',
             ]);
 
-            foreach ($tickets->values() as $index => $ticket) {
-                $sprint->items()->create([
-                    'ticket_id' => $ticket->id,
-                    'position' => $index + 1,
+            $position = 1;
+            foreach ($featureTickets->values() as $ticket) {
+                $generatedTask = Ticket::create([
+                    'client_id' => $ticket->client_id,
+                    'software_id' => $ticket->software_id,
+                    'submitted_by' => $request->user()->id,
+                    'assigned_to' => $ticket->assigned_to,
+                    'ticket_no' => app(\App\Services\TicketNumberService::class)->next(),
+                    'title' => $ticket->title,
+                    'description' => $ticket->description,
+                    'urgency' => $ticket->urgency,
+                    'type' => Ticket::TYPE_TASK,
+                    'status' => Ticket::STATUS_BACKLOG,
+                    'submitted_at' => now(),
+                    'start_date' => $ticket->start_date,
+                    'due_date' => $ticket->due_date,
+                    'estimated_hours' => $ticket->estimated_hours,
+                    'source_feature_id' => $ticket->id,
+                    'generated_from_sprint_id' => $sprint->id,
+                    'is_generated_task' => true,
                 ]);
 
-                $oldStatus = $ticket->status;
-                $ticket->update(['status' => Ticket::STATUS_IN_PROGRESS]);
+                $sprint->items()->create([
+                    'ticket_id' => $generatedTask->id,
+                    'position' => $position++,
+                ]);
 
-                $this->ticketActivityService->log($ticket, 'sprint started', 'Feature added to '.$sprint->name.' and moved into progress.', $request->user(), $oldStatus, Ticket::STATUS_IN_PROGRESS);
+                $this->ticketActivityService->log($generatedTask, 'created from feature for sprint', 'Implementation task generated for '.$sprint->name.'.', $request->user());
+                $this->ticketActivityService->log($ticket, 'converted to task for sprint', 'Feature converted to implementation task '.$generatedTask->ticket_no.' for '.$sprint->name.'.', $request->user());
+            }
+
+            foreach ($bugTickets->values() as $bugTicket) {
+                $sprint->items()->create([
+                    'ticket_id' => $bugTicket->id,
+                    'position' => $position++,
+                ]);
             }
 
             return $sprint;
         });
 
-        return redirect()->route('sprints.show', $sprint)->with('status', 'Sprint started and next sprint features moved into progress.');
+        return redirect()->route('sprints.show', $sprint)->with('status', 'Sprint started: approved features were converted to tasks and selected bugs were attached.');
     }
 
     public function complete(Request $request, Sprint $sprint): RedirectResponse

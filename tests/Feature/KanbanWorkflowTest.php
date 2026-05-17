@@ -36,31 +36,47 @@ class KanbanWorkflowTest extends TestCase
         $this->seed(RoleSeeder::class);
         [$client, $software, $clientUser] = $this->clientWorkspace();
         $developer = $this->kielDeveloper();
-        $first = $this->ticket($client, $software, $clientUser, Ticket::TYPE_FEATURE, Ticket::STATUS_FEATURE_APPROVED, 1000);
-        $second = $this->ticket($client, $software, $clientUser, Ticket::TYPE_FEATURE, Ticket::STATUS_RECOMMENDED, 2000);
+        $first = $this->ticket($client, $software, $clientUser, Ticket::TYPE_TASK, Ticket::STATUS_BACKLOG, 1000);
+        $second = $this->ticket($client, $software, $clientUser, Ticket::TYPE_TASK, Ticket::STATUS_BACKLOG, 2000);
 
         $this->actingAs($developer)
             ->patchJson(route('kanban.tickets.move', $first), [
-                'column' => Ticket::STATUS_RECOMMENDED,
+                'column' => Ticket::STATUS_IN_PROGRESS,
                 'position' => 0,
-                'view' => 'features',
+                'view' => 'all',
             ])
             ->assertOk()
-            ->assertJsonPath('ticket.status', Ticket::STATUS_RECOMMENDED)
-            ->assertJsonPath('ticket.column', Ticket::STATUS_RECOMMENDED);
+            ->assertJsonPath('ticket.status', Ticket::STATUS_IN_PROGRESS)
+            ->assertJsonPath('ticket.column', Ticket::STATUS_IN_PROGRESS);
 
-        $this->assertSame(Ticket::STATUS_RECOMMENDED, $first->refresh()->status);
+        $this->assertSame(Ticket::STATUS_IN_PROGRESS, $first->refresh()->status);
         $this->assertDatabaseHas('ticket_activities', ['ticket_id' => $first->id, 'action' => 'kanban status changed']);
 
         $this->actingAs($developer)
             ->patchJson(route('kanban.tickets.reorder'), [
                 'tickets' => [$second->id, $first->id],
-                'column' => Ticket::STATUS_RECOMMENDED,
-                'view' => 'features',
+                'column' => Ticket::STATUS_BACKLOG,
+                'view' => 'all',
             ])
             ->assertOk();
 
         $this->assertLessThan($first->refresh()->priority_order, $second->refresh()->priority_order);
+    }
+
+    public function test_old_kanban_payload_keys_fail_validation(): void
+    {
+        $this->seed(RoleSeeder::class);
+        [$client, $software, $clientUser] = $this->clientWorkspace();
+        $developer = $this->kielDeveloper();
+        $ticket = $this->ticket($client, $software, $clientUser, Ticket::TYPE_TASK, Ticket::STATUS_BACKLOG, 1000);
+
+        $this->actingAs($developer)
+            ->patchJson(route('kanban.tickets.move', $ticket), ['status' => Ticket::STATUS_IN_PROGRESS, 'view' => 'all'])
+            ->assertStatus(422);
+
+        $this->actingAs($developer)
+            ->patchJson(route('kanban.tickets.reorder'), ['ticket_ids' => [$ticket->id], 'column' => Ticket::STATUS_BACKLOG, 'view' => 'all'])
+            ->assertStatus(422);
     }
 
     public function test_invalid_kanban_transition_is_rejected(): void

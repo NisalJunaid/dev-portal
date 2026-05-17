@@ -27,9 +27,10 @@ class Ticket extends Model
 
     public const TYPE_BUG = 'bug';
     public const TYPE_FEATURE = 'feature';
+    public const TYPE_TASK = 'task';
 
     public const URGENCIES = ['critical', 'high', 'medium', 'low'];
-    public const TYPES = [self::TYPE_BUG, self::TYPE_FEATURE];
+    public const TYPES = [self::TYPE_BUG, self::TYPE_FEATURE, self::TYPE_TASK];
     public const BUG_STATUSES = [self::STATUS_BUG_PENDING, self::STATUS_BUG_BLOCKED, self::STATUS_BUG_COMPLETED];
     public const FEATURE_STATUSES = [self::STATUS_FEATURE_APPROVED, self::STATUS_RECOMMENDED, self::STATUS_NEXT_SPRINT, self::STATUS_IN_PROGRESS, self::STATUS_FEATURE_BLOCKED, self::STATUS_FEATURE_COMPLETED];
     public const STATUSES = [
@@ -69,6 +70,9 @@ class Ticket extends Model
         'timeline_position',
         'parent_ticket_id',
         'depends_on_ticket_id',
+        'source_feature_id',
+        'is_generated_task',
+        'generated_from_sprint_id',
     ];
 
     protected $casts = [
@@ -79,6 +83,7 @@ class Ticket extends Model
         'due_date' => 'date',
         'estimated_hours' => 'decimal:2',
         'actual_completed_at' => 'datetime',
+        'is_generated_task' => 'boolean',
     ];
 
     public function client(): BelongsTo
@@ -109,6 +114,22 @@ class Ticket extends Model
     public function dependency(): BelongsTo
     {
         return $this->belongsTo(self::class, 'depends_on_ticket_id');
+    }
+
+
+    public function sourceFeature(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'source_feature_id');
+    }
+
+    public function generatedTasks(): HasMany
+    {
+        return $this->hasMany(self::class, 'source_feature_id');
+    }
+
+    public function generatedFromSprint(): BelongsTo
+    {
+        return $this->belongsTo(Sprint::class, 'generated_from_sprint_id');
     }
 
     public function comments(): HasMany
