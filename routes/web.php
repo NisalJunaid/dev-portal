@@ -27,6 +27,7 @@ Route::middleware('auth')->group(function () {
     Route::patch('/tickets/{ticket}/classify', [TicketController::class, 'classify'])->name('tickets.classify');
     Route::patch('/tickets/{ticket}/reject', [TicketController::class, 'reject'])->name('tickets.reject');
     Route::patch('/tickets/{ticket}/assign', [TicketController::class, 'assign'])->name('tickets.assign');
+    Route::patch('/tickets/{ticket}/inline-update', [TicketController::class, 'inlineUpdate'])->name('tickets.inline-update');
     Route::post('/tickets/{ticket}/comments', [TicketController::class, 'comment'])->name('tickets.comments.store');
     Route::post('/tickets/{ticket}/block', [TicketBlockController::class, 'block'])->name('tickets.block');
     Route::post('/tickets/{ticket}/unblock', [TicketBlockController::class, 'unblock'])->name('tickets.unblock');

@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Client;
 use App\Models\Software;
+use App\Models\Sprint;
 use App\Models\Ticket;
 use App\Models\TicketComment;
 use App\Models\User;
@@ -11,9 +13,11 @@ use App\Services\TicketBlockService;
 use App\Services\TicketNumberService;
 use App\Services\TimeTrackingService;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -31,14 +35,68 @@ class TicketController extends Controller
     {
         abort_unless($request->user()->can('view tickets'), 403);
 
-        $tickets = $this->visibleTickets($request)
-            ->with(['client', 'software', 'submitter', 'assignee'])
-            ->latest('submitted_at')
-            ->paginate(12);
+        $validated = $request->validate([
+            'search' => ['nullable', 'string', 'max:255'],
+            'type' => ['nullable', Rule::in(Ticket::TYPES)],
+            'urgency' => ['nullable', Rule::in(Ticket::URGENCIES)],
+            'status' => ['nullable', Rule::in(Ticket::STATUSES)],
+            'assigned_to' => ['nullable', 'string'],
+            'client_id' => ['nullable', 'integer', Rule::exists('clients', 'id')],
+            'software_id' => ['nullable', 'integer', Rule::exists('softwares', 'id')],
+            'blocked' => ['nullable', Rule::in(['yes', 'no'])],
+            'sort' => ['nullable', Rule::in(['ticket_no', 'title', 'type', 'urgency', 'status', 'assigned_to', 'client', 'software', 'start_date', 'due_date', 'sprint', 'blocked', 'updated_at'])],
+            'direction' => ['nullable', Rule::in(['asc', 'desc'])],
+            'per_page' => ['nullable', 'integer', 'min:10', 'max:100'],
+        ]);
+
+        $sort = $validated['sort'] ?? 'updated_at';
+        $direction = $validated['direction'] ?? 'desc';
+
+        $ticketsQuery = $this->visibleTickets($request)
+            ->with(['client', 'software', 'submitter', 'assignee', 'sprints'])
+            ->withExists(['activeBlock as is_blocked'])
+            ->when($validated['search'] ?? null, function ($query, string $search) {
+                $query->where(function ($query) use ($search) {
+                    $query->where('ticket_no', 'like', '%'.$search.'%')
+                        ->orWhere('title', 'like', '%'.$search.'%')
+                        ->orWhereHas('client', fn ($query) => $query->where('name', 'like', '%'.$search.'%'))
+                        ->orWhereHas('software', fn ($query) => $query->where('name', 'like', '%'.$search.'%'))
+                        ->orWhereHas('assignee', fn ($query) => $query->where('name', 'like', '%'.$search.'%'));
+                });
+            })
+            ->when($validated['type'] ?? null, fn ($query, string $type) => $query->where('type', $type))
+            ->when($validated['urgency'] ?? null, fn ($query, string $urgency) => $query->where('urgency', $urgency))
+            ->when($validated['status'] ?? null, fn ($query, string $status) => $query->where('status', $status))
+            ->when(($validated['assigned_to'] ?? null) === 'unassigned', fn ($query) => $query->whereNull('assigned_to'))
+            ->when(($validated['assigned_to'] ?? null) && ($validated['assigned_to'] ?? null) !== 'unassigned', fn ($query) => $query->where('assigned_to', $validated['assigned_to']))
+            ->when(($validated['client_id'] ?? null) && $request->user()->isKielUser(), fn ($query, int $clientId) => $query->where('client_id', $clientId))
+            ->when($validated['software_id'] ?? null, fn ($query, int $softwareId) => $query->where('software_id', $softwareId))
+            ->when(($validated['blocked'] ?? null) === 'yes', fn ($query) => $query->whereIn('status', [Ticket::STATUS_BUG_BLOCKED, Ticket::STATUS_FEATURE_BLOCKED]))
+            ->when(($validated['blocked'] ?? null) === 'no', fn ($query) => $query->whereNotIn('status', [Ticket::STATUS_BUG_BLOCKED, Ticket::STATUS_FEATURE_BLOCKED]));
+
+        match ($sort) {
+            'client' => $ticketsQuery->join('clients', 'tickets.client_id', '=', 'clients.id')->orderBy('clients.name', $direction)->select('tickets.*'),
+            'software' => $ticketsQuery->join('softwares', 'tickets.software_id', '=', 'softwares.id')->orderBy('softwares.name', $direction)->select('tickets.*'),
+            'assigned_to' => $ticketsQuery->leftJoin('users as assignees', 'tickets.assigned_to', '=', 'assignees.id')->orderBy('assignees.name', $direction)->select('tickets.*'),
+            'sprint' => $ticketsQuery->orderBy(Sprint::select('sprint_no')->join('sprint_items', 'sprints.id', '=', 'sprint_items.sprint_id')->whereColumn('sprint_items.ticket_id', 'tickets.id')->latest('sprints.sprint_no')->limit(1), $direction),
+            'blocked' => $ticketsQuery->orderByRaw("case when tickets.status in (?, ?) then 1 else 0 end {$direction}", [Ticket::STATUS_BUG_BLOCKED, Ticket::STATUS_FEATURE_BLOCKED]),
+            default => $ticketsQuery->orderBy('tickets.'.$sort, $direction),
+        };
+
+        $tickets = $ticketsQuery
+            ->orderBy('tickets.id')
+            ->paginate($validated['per_page'] ?? 25)
+            ->withQueryString();
 
         return view('tickets.index', [
             'tickets' => $tickets,
             'isKielUser' => $request->user()->isKielUser(),
+            'teamMembers' => $this->teamMembers(),
+            'clients' => $request->user()->isKielUser() ? Client::orderBy('name')->get() : collect(),
+            'softwares' => $this->availableSoftware($request)->get(),
+            'filters' => $validated,
+            'sort' => $sort,
+            'direction' => $direction,
         ]);
     }
 
@@ -271,6 +329,90 @@ class TicketController extends Controller
         return back()->with('status', 'Ticket details updated.');
     }
 
+
+    public function inlineUpdate(Request $request, Ticket $ticket): JsonResponse
+    {
+        $this->authorizeTicketAccess($request, $ticket);
+
+        if (! $request->user()->isKielUser()) {
+            return response()->json([
+                'message' => 'Clients cannot inline edit operational ticket fields. Please use comments or recommendation workflows.',
+            ], 403);
+        }
+
+        $validated = $request->validate([
+            'field' => ['required', Rule::in(['title', 'urgency', 'assigned_to', 'start_date', 'due_date', 'status'])],
+            'value' => ['nullable'],
+        ]);
+
+        $field = $validated['field'];
+        $value = $validated['value'] ?? null;
+        $rules = $this->inlineUpdateRules($field, $ticket);
+
+        $fieldValidator = Validator::make(['value' => $value], ['value' => $rules]);
+
+        if ($fieldValidator->fails()) {
+            throw ValidationException::withMessages([
+                $field => $fieldValidator->errors()->first('value'),
+            ]);
+        }
+
+        if ($field === 'status' && in_array($value, [Ticket::STATUS_BUG_BLOCKED, Ticket::STATUS_FEATURE_BLOCKED], true) && ! $ticket->isBlocked()) {
+            throw ValidationException::withMessages([
+                'status' => 'Use the Block button and provide a reason to block tickets.',
+            ]);
+        }
+
+        if ($field === 'due_date' && $ticket->start_date && $value && $value < $ticket->start_date->toDateString()) {
+            throw ValidationException::withMessages([
+                'due_date' => 'The due date must be after or equal to the start date.',
+            ]);
+        }
+
+        if ($field === 'start_date' && $ticket->due_date && $value && $value > $ticket->due_date->toDateString()) {
+            throw ValidationException::withMessages([
+                'start_date' => 'The start date must be before or equal to the due date.',
+            ]);
+        }
+
+        $oldValue = $ticket->{$field};
+        $normalizedValue = $value === '' ? null : $value;
+
+        DB::transaction(function () use ($ticket, $field, $normalizedValue, $oldValue, $request) {
+            $updates = [$field => $normalizedValue];
+
+            if ($field === 'status') {
+                if ($ticket->type === Ticket::TYPE_BUG && $normalizedValue === Ticket::STATUS_BUG_COMPLETED) {
+                    $updates['completed_at'] = $ticket->completed_at ?? now();
+                    $updates['actual_completed_at'] = $ticket->actual_completed_at ?? now();
+                } elseif ($ticket->status === Ticket::STATUS_BUG_COMPLETED && $normalizedValue !== Ticket::STATUS_BUG_COMPLETED) {
+                    $updates['completed_at'] = null;
+                    $updates['actual_completed_at'] = null;
+                }
+            }
+
+            $ticket->update($updates);
+
+            if ((string) $oldValue !== (string) $ticket->{$field}) {
+                $this->ticketActivityService->log(
+                    $ticket,
+                    $this->inlineActivityAction($field),
+                    'Ticket '.str($field)->replace('_', ' ')->headline()->lower().' updated inline.',
+                    $request->user(),
+                    $oldValue,
+                    $ticket->{$field}
+                );
+            }
+        });
+
+        $ticket->refresh()->load(['client', 'software', 'assignee', 'sprints']);
+
+        return response()->json([
+            'message' => 'Ticket updated.',
+            'ticket' => $this->inlineTicketPayload($ticket),
+        ]);
+    }
+
     public function comment(Request $request, Ticket $ticket): RedirectResponse
     {
         $this->authorizeTicketAccess($request, $ticket);
@@ -294,6 +436,53 @@ class TicketController extends Controller
         $this->ticketActivityService->log($ticket, 'comment added', $isInternal ? 'Internal comment added.' : 'Comment added.', $request->user());
 
         return back()->with('status', 'Comment added.');
+    }
+
+    private function inlineUpdateRules(string $field, Ticket $ticket): array
+    {
+        return match ($field) {
+            'title' => ['required', 'string', 'max:255'],
+            'urgency' => ['required', Rule::in(Ticket::URGENCIES)],
+            'assigned_to' => ['nullable', Rule::exists('users', 'id')],
+            'start_date' => ['nullable', 'date'],
+            'due_date' => ['nullable', 'date'],
+            'status' => ['required', Rule::in($ticket->isBug() ? Ticket::BUG_STATUSES : ($ticket->isFeature() ? Ticket::FEATURE_STATUSES : Ticket::STATUSES))],
+        };
+    }
+
+    private function inlineActivityAction(string $field): string
+    {
+        return match ($field) {
+            'title' => 'title changed',
+            'urgency' => 'urgency changed',
+            'assigned_to' => 'assigned',
+            'start_date', 'due_date' => 'dates changed',
+            'status' => 'status changed',
+        };
+    }
+
+    private function inlineTicketPayload(Ticket $ticket): array
+    {
+        $latestSprint = $ticket->sprints->sortByDesc('sprint_no')->first();
+
+        return [
+            'id' => $ticket->id,
+            'title' => $ticket->title,
+            'urgency' => $ticket->urgency,
+            'urgency_label' => $ticket->formattedUrgency(),
+            'assigned_to' => $ticket->assigned_to,
+            'assignee_name' => $ticket->assignee?->name ?? 'Unassigned',
+            'start_date' => $ticket->start_date?->toDateString(),
+            'start_date_label' => $ticket->start_date?->format('M j, Y') ?? 'Not set',
+            'due_date' => $ticket->due_date?->toDateString(),
+            'due_date_label' => $ticket->due_date?->format('M j, Y') ?? 'Not set',
+            'due_date_overdue' => $ticket->due_date !== null && $ticket->due_date->isPast() && ! in_array($ticket->status, [Ticket::STATUS_BUG_COMPLETED, Ticket::STATUS_FEATURE_COMPLETED], true),
+            'status' => $ticket->status,
+            'status_label' => $ticket->formattedStatus(),
+            'blocked' => $ticket->isBlocked(),
+            'sprint_cycle' => $latestSprint ? '#'.$latestSprint->sprint_no.' '.$latestSprint->name : 'No sprint',
+            'updated_at' => $ticket->updated_at?->format('M j, Y g:i A'),
+        ];
     }
 
     private function visibleTickets(Request $request)
