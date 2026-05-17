@@ -6,6 +6,7 @@ use App\Http\Controllers\FeatureController;
 use App\Http\Controllers\App\DashboardController;
 use App\Http\Controllers\App\PageController;
 use App\Http\Controllers\SoftwareController;
+use App\Http\Controllers\SprintController;
 use App\Http\Controllers\TicketController;
 use Illuminate\Support\Facades\Route;
 
@@ -42,7 +43,13 @@ Route::middleware('auth')->group(function () {
     Route::post('/features/{ticket}/defer', [FeatureController::class, 'defer'])->name('features.defer');
     Route::post('/features/{ticket}/complete', [FeatureController::class, 'complete'])->name('features.complete');
 
-    foreach (['sprints', 'timeline', 'reports', 'settings'] as $section) {
+    Route::get('/sprints', [SprintController::class, 'index'])->name('sprints.index');
+    Route::get('/sprints/start', [SprintController::class, 'startForm'])->name('sprints.start');
+    Route::get('/sprints/{sprint}', [SprintController::class, 'show'])->name('sprints.show');
+    Route::post('/sprints/start', [SprintController::class, 'start'])->name('sprints.start.store');
+    Route::post('/sprints/{sprint}/complete', [SprintController::class, 'complete'])->name('sprints.complete');
+
+    foreach (['timeline', 'reports', 'settings'] as $section) {
         Route::get('/'.$section, PageController::class)
             ->defaults('section', $section)
             ->name($section.'.index');
