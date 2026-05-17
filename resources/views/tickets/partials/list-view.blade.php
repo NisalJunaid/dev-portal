@@ -20,7 +20,6 @@
 <section
     class="card overflow-hidden p-0"
     x-data="ticketList({
-        csrf: @js(csrf_token()),
         canInlineEdit: @js($isKielUser),
         urgencyOptions: @js($urgencyOptions),
         teamMembers: @js($teamMemberOptions),
@@ -125,7 +124,7 @@
                             $rowStatusOptions = $ticket->isBug() ? $statusOptions['bug'] : ($ticket->isFeature() ? $statusOptions['feature'] : $statusOptions['all']);
                         @endphp
                         <tr
-                            class="group transition duration-150 ease-out hover:bg-indigo-50/40"
+                            @class(['group transition duration-150 ease-out hover:bg-indigo-50/40', 'bg-rose-50/40' => $isOverdue, 'bg-slate-50' => $ticket->isBlocked(), 'ring-1 ring-inset ring-rose-100' => $ticket->urgency === 'critical'])
                             x-data="ticketRow({
                                 endpoint: @js(route('tickets.inline-update', $ticket)),
                                 values: @js([
@@ -169,7 +168,7 @@
                                     </select>
                                     <span x-show="states.urgency === 'saving'" class="ml-2 text-xs font-black text-indigo-600">Saving…</span>
                                 @else
-                                    <span @class(['rounded-full px-3 py-1 text-xs font-black uppercase tracking-wide', 'bg-rose-100 text-rose-700' => $ticket->urgency === 'critical', 'bg-orange-100 text-orange-700' => $ticket->urgency === 'high', 'bg-amber-100 text-amber-700' => $ticket->urgency === 'medium', 'bg-emerald-100 text-emerald-700' => $ticket->urgency === 'low'])>{{ $ticket->formattedUrgency() }}</span>
+                                    <span @class(['badge', 'badge-urgency-critical' => $ticket->urgency === 'critical', 'badge-urgency-high' => $ticket->urgency === 'high', 'badge-urgency-medium' => $ticket->urgency === 'medium', 'badge-urgency-low' => $ticket->urgency === 'low'])>{{ $ticket->formattedUrgency() }}</span>
                                 @endif
                             </td>
                             <td class="whitespace-nowrap px-4 py-3 align-top">
@@ -181,7 +180,7 @@
                                     </select>
                                     <span x-show="states.status === 'saving'" class="ml-2 text-xs font-black text-indigo-600">Saving…</span>
                                 @else
-                                    <span @class(['rounded-full px-3 py-1 text-xs font-black uppercase tracking-wide', 'bg-rose-100 text-rose-700' => $ticket->isBlocked(), 'bg-emerald-100 text-emerald-700' => in_array($ticket->status, [\App\Models\Ticket::STATUS_BUG_COMPLETED, \App\Models\Ticket::STATUS_FEATURE_COMPLETED], true), 'bg-indigo-100 text-indigo-700' => $ticket->status === \App\Models\Ticket::STATUS_IN_PROGRESS, 'bg-slate-100 text-slate-700' => ! $ticket->isBlocked()])>{{ $ticket->formattedStatus() }}</span>
+                                    <span @class(['badge', 'badge-blocked' => $ticket->isBlocked(), 'bg-emerald-100 text-emerald-700 ring-emerald-200' => in_array($ticket->status, [\App\Models\Ticket::STATUS_BUG_COMPLETED, \App\Models\Ticket::STATUS_FEATURE_COMPLETED], true), 'bg-indigo-100 text-indigo-700 ring-indigo-200' => $ticket->status === \App\Models\Ticket::STATUS_IN_PROGRESS, 'badge-status' => ! $ticket->isBlocked()])>{{ $ticket->formattedStatus() }}</span>
                                 @endif
                             </td>
                             <td class="whitespace-nowrap px-4 py-3 align-top">
@@ -210,12 +209,12 @@
                                 @else
                                     <span @class(['font-bold' => $isOverdue, 'text-rose-700' => $isOverdue, 'text-slate-600' => ! $isOverdue])>{{ $ticket->due_date?->format('M j, Y') ?? 'Not set' }}</span>
                                 @endif
-                                <span x-show="meta.due_date_overdue" class="ml-2 rounded-full bg-rose-100 px-2 py-0.5 text-xs font-black text-rose-700">Overdue</span>
+                                <span x-show="meta.due_date_overdue" class="badge badge-overdue ml-2">Overdue</span>
                             </td>
                             <td class="whitespace-nowrap px-4 py-4 align-top text-slate-600">{{ $latestSprint ? '#'.$latestSprint->sprint_no.' '.$latestSprint->name : 'No sprint' }}</td>
                             <td class="whitespace-nowrap px-4 py-4 align-top">
-                                <span x-show="meta.blocked" class="rounded-full bg-rose-100 px-3 py-1 text-xs font-black uppercase tracking-wide text-rose-700">Blocked</span>
-                                <span x-show="! meta.blocked" class="rounded-full bg-emerald-50 px-3 py-1 text-xs font-black uppercase tracking-wide text-emerald-700">Clear</span>
+                                <span x-show="meta.blocked" class="badge badge-blocked">Blocked</span>
+                                <span x-show="! meta.blocked" class="badge bg-emerald-50 text-emerald-700 ring-emerald-200">Clear</span>
                             </td>
                             <td class="whitespace-nowrap px-4 py-4 align-top text-slate-500" x-text="labels.updated_at"></td>
                         </tr>
@@ -258,20 +257,10 @@
                 this.errors[field] = '';
 
                 try {
-                    const response = await fetch(this.endpoint, {
+                    const payload = await window.Kiel.request(this.endpoint, {
                         method: 'PATCH',
-                        headers: {
-                            'Accept': 'application/json',
-                            'Content-Type': 'application/json',
-                            'X-CSRF-TOKEN': window.ticketListConfig.csrf,
-                        },
                         body: JSON.stringify({ field, value: attemptedValue }),
                     });
-                    const payload = await response.json();
-
-                    if (! response.ok) {
-                        throw payload;
-                    }
 
                     this.applyPayload(payload.ticket);
                     this.states[field] = 'success';
@@ -280,10 +269,12 @@
                             this.states[field] = '';
                         }
                     }, 1400);
+                    window.Kiel?.toast(payload.message || 'Ticket updated.');
                 } catch (error) {
                     this.values[field] = this.original[field];
-                    this.errors[field] = error?.errors?.[field]?.[0] || error?.message || 'Unable to save this field.';
+                    this.errors[field] = error?.payload?.errors?.[field]?.[0] || error?.message || 'Unable to save this field.';
                     this.states[field] = 'error';
+                    window.Kiel?.toast(this.errors[field], 'error');
                 }
             },
             applyPayload(ticket) {

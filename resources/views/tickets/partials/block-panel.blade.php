@@ -19,8 +19,7 @@
             block: @js(route('tickets.block', $ticket)),
             unblock: @js(route('tickets.unblock', $ticket)),
         },
-        csrf: @js(csrf_token()),
-    })"
+            })"
 >
     <div class="flex items-center justify-between gap-3">
         <div>
@@ -77,8 +76,7 @@
             activeBlock: config.activeBlock,
             totalBlockedSeconds: config.totalBlockedSeconds || 0,
             routes: config.routes,
-            csrf: config.csrf,
-            modal: null,
+                        modal: null,
             modalText: '',
             saving: false,
             message: '',
@@ -121,30 +119,22 @@
                     const body = action === 'block'
                         ? { reason: this.modalText }
                         : { unblock_note: this.modalText };
-                    const response = await fetch(this.routes[action], {
+                    const data = await window.Kiel.request(this.routes[action], {
                         method: 'POST',
-                        headers: {
-                            'Accept': 'application/json',
-                            'Content-Type': 'application/json',
-                            'X-CSRF-TOKEN': this.csrf,
-                        },
                         body: JSON.stringify(body),
                     });
-                    const data = await response.json();
-
-                    if (!response.ok) {
-                        throw new Error(data.message || 'Unable to update blocked state.');
-                    }
 
                     this.status = data.ticket.status;
                     this.formattedStatus = data.ticket.formatted_status;
                     this.activeBlock = data.active_block;
                     this.totalBlockedSeconds = data.ticket.total_blocked_duration_seconds;
                     this.message = data.message;
+                    window.Kiel?.toast(data.message || 'Blocked state updated.');
                     window.dispatchEvent(new CustomEvent('ticket-block-updated', { detail: data }));
                     this.closeModal();
                 } catch (e) {
                     this.error = e.message || 'Unable to update blocked state.';
+                    window.Kiel?.toast(this.error, 'error');
                 } finally {
                     this.saving = false;
                 }

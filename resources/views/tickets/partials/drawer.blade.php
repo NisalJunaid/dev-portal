@@ -21,8 +21,8 @@
                         <h3 class="mt-2 text-2xl font-black tracking-tight text-slate-950">{{ $ticket->title }}</h3>
                     @endif
                     <div class="mt-3 flex flex-wrap items-center gap-2 text-xs font-black uppercase tracking-wide">
-                        <span class="rounded-full bg-slate-100 px-3 py-1 text-slate-700">{{ $ticket->formattedStatus() }}</span>
-                        <span @class(['rounded-full px-3 py-1', 'bg-rose-100 text-rose-700' => $ticket->urgency === 'critical', 'bg-orange-100 text-orange-700' => $ticket->urgency === 'high', 'bg-amber-100 text-amber-700' => $ticket->urgency === 'medium', 'bg-emerald-100 text-emerald-700' => $ticket->urgency === 'low'])>{{ $ticket->formattedUrgency() }}</span>
+                        <span class="badge badge-status">{{ $ticket->formattedStatus() }}</span>
+                        <span @class(['badge', 'badge-urgency-critical' => $ticket->urgency === 'critical', 'badge-urgency-high' => $ticket->urgency === 'high', 'badge-urgency-medium' => $ticket->urgency === 'medium', 'badge-urgency-low' => $ticket->urgency === 'low'])>{{ $ticket->formattedUrgency() }}</span>
                     </div>
                 </div>
                 <button type="button" data-ticket-drawer-close class="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-black text-slate-600 transition hover:border-indigo-200 hover:text-indigo-700">Close</button>
@@ -124,7 +124,7 @@
                     </div>
                     <div class="mt-4 grid grid-cols-2 gap-3">
                         @foreach (['start' => 'Start', 'pause' => 'Pause', 'resume' => 'Resume', 'stop' => 'Stop'] as $action => $label)
-                            <button type="button" data-drawer-action="timer" data-action-url="{{ route('tickets.timer.'.$action, $ticket) }}" class="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-black text-white shadow-soft transition hover:bg-indigo-700">{{ $label }}</button>
+                            <button type="button" data-drawer-action="timer" data-action-url="{{ route('tickets.timer.'.$action, $ticket) }}" data-saving-label="Saving…" @if($action === 'stop') data-confirm-title="Stop timer?" data-confirm-message="This will complete the active timer and add the elapsed time to the ticket." data-confirm-label="Stop timer" @endif class="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-black text-white shadow-soft transition hover:bg-indigo-700">{{ $label }}</button>
                         @endforeach
                     </div>
                 </section>
@@ -133,13 +133,13 @@
                     <h4 class="text-sm font-black uppercase tracking-[0.2em] text-slate-400">Block controls</h4>
                     <div class="mt-4 grid gap-3">
                         @unless ($activeBlock)
-                            <form data-drawer-action-form="block" action="{{ route('tickets.block', $ticket) }}" class="space-y-3">
+                            <form data-drawer-action-form="block" data-confirm-title="Block ticket?" data-confirm-message="Blocking highlights this ticket and pauses forward progress until it is unblocked." data-confirm-label="Block ticket" action="{{ route('tickets.block', $ticket) }}" class="space-y-3">
                                 <textarea name="reason" rows="3" class="w-full rounded-2xl border-slate-200 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" placeholder="Reason for blocking"></textarea>
                                 <button type="submit" class="rounded-2xl bg-rose-600 px-4 py-2 text-sm font-black text-white shadow-soft">Block ticket</button>
                             </form>
                         @endunless
                         @if ($activeBlock)
-                            <form data-drawer-action-form="unblock" action="{{ route('tickets.unblock', $ticket) }}" class="space-y-3 border-t border-slate-100 pt-3">
+                            <form data-drawer-action-form="unblock" data-confirm-title="Unblock ticket?" data-confirm-message="This records the unblock note and returns the ticket to active workflow." data-confirm-label="Unblock ticket" action="{{ route('tickets.unblock', $ticket) }}" class="space-y-3 border-t border-slate-100 pt-3">
                                 <textarea name="unblock_note" rows="3" class="w-full rounded-2xl border-slate-200 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" placeholder="Unblock note"></textarea>
                                 <button type="submit" class="rounded-2xl bg-emerald-600 px-4 py-2 text-sm font-black text-white shadow-soft">Unblock ticket</button>
                             </form>
@@ -152,7 +152,7 @@
                 <section class="rounded-3xl border border-indigo-200 bg-indigo-50 p-5 shadow-sm">
                     <h4 class="text-sm font-black uppercase tracking-[0.2em] text-indigo-700">Client planning</h4>
                     <p class="mt-2 text-sm font-semibold text-indigo-900">Recommend this feature for the next planning cycle.</p>
-                    <button type="button" data-drawer-action="recommend" data-action-url="{{ route('features.recommend', $ticket) }}" class="mt-4 rounded-2xl bg-indigo-600 px-5 py-3 text-sm font-black text-white shadow-soft">Recommend feature</button>
+                    <button type="button" data-drawer-action="recommend" data-action-url="{{ route('features.recommend', $ticket) }}" data-confirm-title="Recommend feature?" data-confirm-message="This will move the feature into the recommended planning queue." data-confirm-label="Recommend" class="mt-4 rounded-2xl bg-indigo-600 px-5 py-3 text-sm font-black text-white shadow-soft">Recommend feature</button>
                 </section>
             @endif
 
@@ -184,7 +184,7 @@
 @else
     <div data-global-ticket-drawer data-ticket-drawer data-timeline-drawer class="fixed inset-0 z-50 hidden" aria-hidden="true">
         <button type="button" data-ticket-drawer-backdrop class="absolute inset-0 bg-slate-950/40 opacity-0 transition-opacity duration-200" aria-label="Close task drawer"></button>
-        <aside data-ticket-drawer-panel class="absolute inset-y-0 right-0 w-full max-w-2xl translate-x-full overflow-hidden border-l border-slate-200 bg-white shadow-2xl transition-transform duration-300 ease-out">
+        <aside data-ticket-drawer-panel class="absolute inset-y-0 right-0 w-full max-w-2xl translate-x-full overflow-hidden border-l border-slate-200 bg-white shadow-2xl transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]">
             <div data-ticket-drawer-loading class="flex h-full items-center justify-center p-8 text-sm font-black uppercase tracking-[0.25em] text-slate-400">Loading task…</div>
             <div data-ticket-drawer-body class="h-full"></div>
         </aside>
@@ -192,7 +192,6 @@
 
     <script>
         window.ticketDrawer = window.ticketDrawer || (() => {
-            const csrf = @js(csrf_token());
             let root, panel, backdrop, body, loading, currentUrl;
 
             const bind = () => {
@@ -245,9 +244,7 @@
                 loading?.classList.remove('hidden');
                 if (body) body.innerHTML = '';
                 try {
-                    const response = await fetch(url, { headers: { Accept: 'application/json' } });
-                    const payload = await response.json();
-                    if (!response.ok) throw new Error(payload.message || 'Task drawer could not load.');
+                    const payload = await window.Kiel.request(url);
                     if (body) {
                         body.innerHTML = payload.html;
                         body.querySelectorAll('[data-inline-field]').forEach(element => { element.dataset.originalValue = fieldValue(element); });
@@ -265,6 +262,7 @@
                 box.textContent = message;
                 box.className = `rounded-2xl border px-4 py-3 text-sm font-bold ${type === 'error' ? 'border-rose-200 bg-rose-50 text-rose-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800'}`;
                 box.classList.remove('hidden');
+                window.Kiel?.toast(message, type);
             };
 
             const fieldValue = element => element.type === 'checkbox' ? (element.checked ? '1' : '0') : element.value;
@@ -272,17 +270,17 @@
                 if (!element.dataset.inlineField || element.dataset.originalValue === fieldValue(element)) return;
                 element.dataset.originalValue = fieldValue(element);
                 try {
-                    const response = await fetch(element.dataset.inlineUrl, {
+                    element.classList.add('saving-state');
+                    const payload = await window.Kiel.request(element.dataset.inlineUrl, {
                         method: 'PATCH',
-                        headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf },
                         body: JSON.stringify({ field: element.dataset.inlineField, value: fieldValue(element) }),
                     });
-                    const payload = await response.json();
-                    if (!response.ok) throw new Error(payload.errors?.[element.dataset.inlineField]?.[0] || payload.message || 'Unable to save field.');
                     flash(payload.message || 'Task updated.');
                     await load();
                 } catch (error) {
                     flash(error.message || 'Unable to save field.', 'error');
+                } finally {
+                    element.classList.remove('saving-state');
                 }
             };
             const handleInlineBlur = event => {
@@ -297,14 +295,23 @@
                 const button = event.target.closest('[data-drawer-action]');
                 if (!button) return;
                 const action = button.dataset.drawerAction;
+                if (button.dataset.confirmTitle) {
+                    const confirmed = await window.Kiel.confirm({
+                        title: button.dataset.confirmTitle,
+                        message: button.dataset.confirmMessage,
+                        confirmLabel: button.dataset.confirmLabel,
+                    });
+                    if (!confirmed) return;
+                }
+                window.Kiel.setLoading(button, true, button.dataset.savingLabel || 'Saving…');
                 try {
-                    const response = await fetch(button.dataset.actionUrl, { method: 'POST', headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrf } });
-                    const payload = await response.json().catch(() => ({}));
-                    if (!response.ok) throw new Error(payload.message || 'Action failed.');
+                    const payload = await window.Kiel.request(button.dataset.actionUrl, { method: 'POST' });
                     flash(payload.message || (action === 'recommend' ? 'Feature recommended.' : 'Action complete.'));
                     await load();
                 } catch (error) {
                     flash(error.message || 'Action failed.', 'error');
+                } finally {
+                    window.Kiel.setLoading(button, false);
                 }
             };
 
@@ -312,19 +319,28 @@
                 const form = event.target.closest('[data-drawer-comment-form], [data-drawer-action-form]');
                 if (!form) return;
                 event.preventDefault();
+                if (form.dataset.confirmTitle) {
+                    const confirmed = await window.Kiel.confirm({
+                        title: form.dataset.confirmTitle,
+                        message: form.dataset.confirmMessage,
+                        confirmLabel: form.dataset.confirmLabel,
+                    });
+                    if (!confirmed) return;
+                }
+                const submitter = form.querySelector('[type="submit"]');
+                window.Kiel.setLoading(submitter, true, 'Saving…');
                 try {
-                    const response = await fetch(form.action, {
+                    const payload = await window.Kiel.request(form.action, {
                         method: 'POST',
-                        headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrf },
                         body: new FormData(form),
                     });
-                    const payload = await response.json().catch(() => ({}));
-                    if (!response.ok) throw new Error(payload.message || 'Unable to save.');
                     flash(payload.message || 'Saved.');
                     form.reset();
                     await load();
                 } catch (error) {
                     flash(error.message || 'Unable to save.', 'error');
+                } finally {
+                    window.Kiel.setLoading(submitter, false);
                 }
             };
 

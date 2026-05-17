@@ -65,7 +65,7 @@
                     <h3 class="mt-2 text-xl font-black text-slate-950">Workflow</h3>
                     <div class="mt-5 grid gap-3">
                         @if ($ticket->status === App\Models\Ticket::STATUS_FEATURE_APPROVED)
-                            <form method="POST" action="{{ route('features.recommend', $ticket) }}">@csrf<button type="submit" class="w-full rounded-2xl border border-indigo-200 bg-indigo-50 px-4 py-2.5 text-sm font-black text-indigo-800">Recommend for next cycle</button></form>
+                            <form method="POST" action="{{ route('features.recommend', $ticket) }}" data-ajax-action data-confirm-title="Recommend feature?" data-confirm-message="This will move the feature into the recommended planning queue." data-confirm-label="Recommend" data-replace-with-status>@csrf<button type="submit" class="w-full rounded-2xl border border-indigo-200 bg-indigo-50 px-4 py-2.5 text-sm font-black text-indigo-800">Recommend for next cycle</button></form>
                         @endif
                         @if ($isKielUser)
                             @if (in_array($ticket->status, [App\Models\Ticket::STATUS_FEATURE_APPROVED, App\Models\Ticket::STATUS_RECOMMENDED], true))

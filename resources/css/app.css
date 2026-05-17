@@ -45,3 +45,96 @@
         @apply rotate-1 cursor-grabbing;
     }
 }
+
+@layer base {
+    [x-cloak] {
+        display: none !important;
+    }
+}
+
+@layer components {
+    .badge {
+        @apply inline-flex items-center rounded-full px-3 py-1 text-xs font-black uppercase tracking-wide ring-1 ring-inset;
+    }
+
+    .badge-status {
+        @apply bg-slate-100 text-slate-700 ring-slate-200;
+    }
+
+    .badge-urgency-critical {
+        @apply bg-rose-100 text-rose-800 ring-rose-200 shadow-[0_0_0_3px_rgba(225,29,72,0.08)];
+    }
+
+    .badge-urgency-high {
+        @apply bg-orange-100 text-orange-800 ring-orange-200;
+    }
+
+    .badge-urgency-medium {
+        @apply bg-amber-100 text-amber-800 ring-amber-200;
+    }
+
+    .badge-urgency-low {
+        @apply bg-emerald-100 text-emerald-800 ring-emerald-200;
+    }
+
+    .badge-blocked {
+        @apply bg-slate-900 text-white ring-slate-900 shadow-[0_0_0_3px_rgba(15,23,42,0.08)];
+    }
+
+    .badge-overdue {
+        @apply bg-rose-50 text-rose-700 ring-rose-200;
+    }
+
+    .empty-state {
+        @apply rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-sm font-bold text-slate-500;
+    }
+
+    .loading-shimmer {
+        @apply relative overflow-hidden bg-slate-100;
+    }
+
+    .loading-shimmer::after {
+        content: '';
+        @apply absolute inset-y-0 -left-1/2 w-1/2 bg-gradient-to-r from-transparent via-white/70 to-transparent;
+        animation: shimmer 1.4s ease-in-out infinite;
+    }
+
+    .kanban-card {
+        @apply will-change-transform;
+        transition: transform 180ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 180ms ease, border-color 180ms ease, opacity 180ms ease;
+    }
+
+    .kanban-card-overdue {
+        @apply border-rose-200 bg-rose-50/40 shadow-[0_0_0_3px_rgba(225,29,72,0.06)];
+    }
+
+    .kanban-card-blocked {
+        @apply border-slate-300 bg-slate-50 shadow-[0_0_0_3px_rgba(15,23,42,0.06)];
+    }
+
+    .kanban-card-critical {
+        @apply border-rose-300 shadow-[0_14px_35px_rgba(225,29,72,0.12)];
+    }
+}
+
+@layer utilities {
+    @keyframes shimmer {
+        0% { transform: translateX(0); }
+        100% { transform: translateX(300%); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after {
+            animation-duration: 0.01ms !important;
+            animation-iteration-count: 1 !important;
+            scroll-behavior: auto !important;
+            transition-duration: 0.01ms !important;
+        }
+    }
+}
+
+@layer components {
+    .saving-state {
+        @apply border-indigo-300 bg-indigo-50/60 ring-2 ring-indigo-100;
+    }
+}

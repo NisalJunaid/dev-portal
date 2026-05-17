@@ -136,8 +136,8 @@
                 <p class="mt-2 text-sm text-slate-500">Add both a start date and due date to tickets, or clear filters to expand the timeline.</p>
             </div>
 
-            <div x-show="tasks.length > 0" class="overflow-x-auto rounded-3xl border border-slate-200 bg-white">
-                <div id="timeline-gantt" class="min-h-[34rem] min-w-[960px] p-4" data-timeline-chart></div>
+            <div x-show="tasks.length > 0" class="overflow-x-auto rounded-3xl border border-slate-200 bg-white motion-safe:transition-opacity motion-safe:duration-300" :class="loading ? 'opacity-50' : 'opacity-100'">
+                <div id="timeline-gantt" class="min-h-[28rem] min-w-[720px] p-4 md:min-h-[34rem] lg:min-w-[960px]" data-timeline-chart></div>
             </div>
         </section>
 
@@ -231,9 +231,7 @@
                     this.loading = true;
                     const params = new URLSearchParams(Object.entries(this.filters).filter(([, value]) => value !== ''));
                     try {
-                        const response = await fetch(`${this.dataUrl}?${params.toString()}`, { headers: { 'Accept': 'application/json' } });
-                        if (!response.ok) throw new Error('Timeline data failed to load.');
-                        const payload = await response.json();
+                        const payload = await window.Kiel.request(`${this.dataUrl}?${params.toString()}`);
                         this.tasks = payload.tasks || [];
                         this.render();
                     } catch (error) {
@@ -275,13 +273,10 @@
                         return;
                     }
                     try {
-                        const response = await fetch(this.dateUrlTemplate.replace('__TICKET__', task.id), {
+                        const payload = await window.Kiel.request(this.dateUrlTemplate.replace('__TICKET__', task.id), {
                             method: 'PATCH',
-                            headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content },
                             body: JSON.stringify({ start_date: this.formatDate(start), due_date: this.formatDate(end) }),
                         });
-                        const payload = await response.json();
-                        if (!response.ok) throw new Error(payload.message || 'Timeline date save failed.');
                         this.replaceTask(payload.task);
                         this.showToast('Timeline dates saved.', 'success');
                     } catch (error) {
@@ -293,13 +288,10 @@
                     if (!this.selectedTask || !this.canEdit) return;
                     this.savingDependency = true;
                     try {
-                        const response = await fetch(this.dependencyUrlTemplate.replace('__TICKET__', this.selectedTask.id), {
+                        const payload = await window.Kiel.request(this.dependencyUrlTemplate.replace('__TICKET__', this.selectedTask.id), {
                             method: 'PATCH',
-                            headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content },
                             body: JSON.stringify({ depends_on_ticket_id: this.dependencyDraft || null }),
                         });
-                        const payload = await response.json();
-                        if (!response.ok) throw new Error(payload.message || 'Dependency save failed.');
                         this.replaceTask(payload.task);
                         this.openDrawer(payload.task);
                         this.render();
@@ -334,6 +326,7 @@
                 },
                 showToast(message, type = 'success') {
                     this.toast = { message, type };
+                    window.Kiel?.toast(message, type);
                     setTimeout(() => {
                         if (this.toast.message === message) this.toast.message = '';
                     }, 5000);

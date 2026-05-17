@@ -24,6 +24,49 @@
 </head>
 <body>
     <div x-data="{ sidebarOpen: false }" class="min-h-screen bg-slate-50">
+
+        <div x-data="toastCenter" x-cloak class="fixed right-4 top-4 z-[70] w-[calc(100%-2rem)] max-w-sm space-y-3 sm:right-6 sm:top-6" aria-live="polite">
+            <template x-for="toast in toasts" :key="toast.id">
+                <div
+                    x-transition:enter="transition ease-out duration-200"
+                    x-transition:enter-start="translate-y-2 opacity-0 sm:translate-x-4 sm:translate-y-0"
+                    x-transition:enter-end="translate-y-0 opacity-100 sm:translate-x-0"
+                    x-transition:leave="transition ease-in duration-150"
+                    x-transition:leave-start="opacity-100"
+                    x-transition:leave-end="opacity-0"
+                    class="rounded-2xl border px-4 py-3 text-sm font-bold shadow-soft backdrop-blur"
+                    :class="toneClasses(toast.type)"
+                >
+                    <div class="flex items-start justify-between gap-3">
+                        <span x-text="toast.message"></span>
+                        <button type="button" class="text-current/60 transition hover:text-current" @click="remove(toast.id)" aria-label="Dismiss notification">×</button>
+                    </div>
+                </div>
+            </template>
+        </div>
+
+        <div x-data="confirmModal" x-cloak x-show="open" class="fixed inset-0 z-[80] flex items-end justify-center p-4 sm:items-center" role="dialog" aria-modal="true" @keydown.escape.window="answer(false)">
+            <div x-show="open" x-transition.opacity class="absolute inset-0 bg-slate-950/50 backdrop-blur-sm" @click="answer(false)"></div>
+            <div
+                x-show="open"
+                x-transition:enter="transition ease-out duration-200"
+                x-transition:enter-start="translate-y-6 opacity-0 scale-95"
+                x-transition:enter-end="translate-y-0 opacity-100 scale-100"
+                x-transition:leave="transition ease-in duration-150"
+                x-transition:leave-start="translate-y-0 opacity-100 scale-100"
+                x-transition:leave-end="translate-y-6 opacity-0 scale-95"
+                class="relative w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl"
+            >
+                <p class="text-xs font-black uppercase tracking-[0.25em] text-slate-400">Please confirm</p>
+                <h2 class="mt-3 text-2xl font-black text-slate-950" x-text="title"></h2>
+                <p class="mt-3 text-sm leading-6 text-slate-600" x-text="message"></p>
+                <div class="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                    <button type="button" class="rounded-2xl border border-slate-200 px-5 py-3 text-sm font-black text-slate-600 transition hover:border-slate-300 hover:text-slate-950" @click="answer(false)" x-text="cancelLabel"></button>
+                    <button type="button" x-ref="confirmButton" class="rounded-2xl px-5 py-3 text-sm font-black shadow-soft transition" :class="confirmClasses()" @click="answer(true)" x-text="confirmLabel"></button>
+                </div>
+            </div>
+        </div>
+
         <div x-show="sidebarOpen" x-transition.opacity class="fixed inset-0 z-30 bg-slate-950/40 lg:hidden" @click="sidebarOpen = false"></div>
 
         <aside class="fixed inset-y-0 left-0 z-40 w-72 -translate-x-full border-r border-slate-200 bg-slate-100/95 px-4 py-5 transition duration-200 ease-out lg:translate-x-0" :class="{ 'translate-x-0': sidebarOpen }">
@@ -79,5 +122,8 @@
             </main>
         </div>
     </div>
+@if (session('status'))
+    <script>window.addEventListener('DOMContentLoaded', () => window.Kiel?.toast(@js(session('status')), 'success'));</script>
+@endif
 </body>
 </html>
