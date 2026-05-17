@@ -1,80 +1,73 @@
 # Implementation Tracker
 
-## Completed: Asana-style interactive ticket list view
+## Completed: Asana-style Kanban board
 
 ### Summary
-Implemented a reusable Asana-style ticket/task list view for the Tickets index with rich search, filtering, sorting, pagination, badges, blocked and overdue indicators, and no-reload inline editing for Kiel operational users.
+Implemented a dedicated Asana-style Kanban board using SortableJS for drag-and-drop planning across all tickets, bugs, features, and sprint task views. The board supports status moves, same-column priority reordering, autosave feedback, invalid-transition rejection with visual revert behavior, toast messaging, and a right-side ticket details drawer.
 
-### Reusable list UI
-- Added `resources/views/tickets/partials/list-view.blade.php` as the reusable ticket list component used by `tickets.index`.
-- The list shows:
+### Kanban views
+- Added a new `Kanban` navigation item and authenticated `/kanban` page.
+- Added board tabs for:
+  - All tickets
+  - Bugs
+  - Features
+  - Sprint tasks
+- Added board-specific columns:
+  - All tickets: Backlog, Recommended, Next Sprint, In Progress, Blocked, Completed, Rejected
+  - Bugs: Pending, Blocked, Completed
+  - Features: Approved, Recommended, Next Sprint, In Progress, Blocked, Completed
+  - Sprint tasks: Approved, Recommended, Next Sprint, In Progress, Blocked, Completed
+
+### Cards and drawer
+- Each Kanban card now shows:
   - Ticket number
   - Title
-  - Type
   - Urgency
-  - Status
-  - Assigned to
+  - Assignee
+  - Due date
   - Client
   - Software
-  - Start date
-  - Due date
-  - Sprint cycle
-  - Blocked indicator
-  - Last updated
-- Added smooth row hover styling for quick scanning.
-- Added urgency and status badges with color-coded states.
-- Added blocked/clear indicators per row.
-- Added overdue due-date highlighting for incomplete tickets.
+  - Blocked badge when applicable
+- Clicking a card opens a right-side drawer with ticket details and a link to the full ticket page.
 
-### Search, filters, sorting, and pagination
-- Added server-side search across ticket number, title, client, software, and assignee.
-- Added filters for type, urgency, status, assignee, client, software, blocked state, and page size.
-- Added sortable table headers for all displayed columns, including related client/software/assignee data and sprint cycle.
-- Pagination preserves the active query string so users do not lose filters or sorting while paging.
+### Drag-and-drop behavior
+- Added SortableJS-powered drag between columns.
+- Added SortableJS-powered reorder within the same column.
+- Added “Saving…” badges while move and reorder requests are in flight.
+- Added success and error toasts.
+- Invalid status transitions are rejected by the API and the client-side card is visually reverted to its original location.
 
-### Inline editing
-- Added Alpine.js inline editing for Kiel users on:
-  - Title
-  - Urgency
-  - Assigned user
-  - Start date
-  - Due date
-  - Status, limited to statuses valid for the ticket type
-- Inline edits use the Fetch API and do not trigger full-page reloads.
-- Each editable field has a per-field saving indicator.
-- Successful saves show a green success state.
-- Failed saves show an error state and immediately revert the edited value to the last saved value.
-- The row updates returned display data after a successful save, including badge values, blocked state, overdue state, assignee label, and last-updated timestamp.
+### Endpoints and service layer
+- Added authenticated endpoint: `PATCH /kanban/tickets/{ticket}/move`.
+- Added authenticated endpoint: `PATCH /kanban/tickets/reorder`.
+- Added `KanbanService` to:
+  - Build board columns and visible ticket queries per view.
+  - Validate board-compatible status transitions.
+  - Enforce Kiel/client permission rules.
+  - Update ticket status.
+  - Update `priority_order`.
+  - Log Kanban move/reorder activity.
+  - Return normalized updated ticket JSON for UI refreshes.
 
-### Endpoint and permissions
-- Added authenticated route: `PATCH /tickets/{ticket}/inline-update`.
-- Added `TicketController::inlineUpdate` to:
-  - Check the user can view tickets and can access the ticket client scope.
-  - Deny client users from inline-editing operational fields.
-  - Validate the requested field name against the explicit inline-edit allowlist.
-  - Validate each field value according to field-specific rules.
-  - Prevent newly moving a ticket into a blocked status through inline status edits; users must still use the Block workflow with a reason.
-  - Save the update in a database transaction.
-  - Log ticket activity when values change.
-  - Return a JSON payload with normalized values and presentation labels.
-
-### Client restrictions
-- Client users can view their scoped tickets but do not receive inline operational controls in the list.
-- Client users attempting to call the inline update endpoint receive `403 Forbidden` and the ticket remains unchanged.
-- Client contribution paths remain through existing comment/recommendation workflows rather than operational inline fields.
+### Permission rules
+- Kiel users can move tickets to statuses allowed by the active board and ticket type.
+- Client users can recommend eligible feature tickets by moving approved features to Recommended.
+- Client users are blocked from moving bugs or internal workflow statuses.
+- Client users remain scoped to tickets for their own client.
 
 ### Verification performed
-- Added `TicketInlineUpdateTest` coverage for:
-  - Kiel inline updates for title, urgency, assigned user, start date, due date, and status.
-  - Activity logging for inline updates.
-  - Invalid inline field names.
-  - Invalid inline values.
-  - Blocking-status protection through inline status edits.
-  - Client users being forbidden from inline operational updates.
-- PHP syntax checks passed for the updated ticket controller, routes, and new inline update test.
-- `composer install --no-interaction --prefer-dist` was attempted but Composer reported that `composer.lock` is missing required packages currently listed in `composer.json` (`spatie/laravel-permission` and `laravel/breeze`), leaving `vendor/autoload.php` unavailable.
-- `php artisan test --filter=TicketInlineUpdateTest` was attempted but could not run because `vendor/autoload.php` is unavailable until Composer dependencies are installable.
-- Browser-based end-to-end inline editing could not be executed in this environment because Composer dependencies are unavailable and the Laravel app cannot boot.
+- Added `KanbanWorkflowTest` coverage for:
+  - Kanban page rendering for SortableJS columns and the right-side drawer.
+  - Kiel user drag/status move.
+  - Kiel user reorder autosave.
+  - Invalid drag/status transition rejection.
+  - Client user recommendation allowance.
+  - Client user internal workflow rejection.
+- PHP syntax checks passed for the new controller, service, views, route file, and test.
+- `npm install sortablejs --save-dev` was attempted, but the registry returned `403 Forbidden`; the board uses the existing CDN SortableJS loading pattern already present in the application.
+- `npm run build` passed successfully.
+- `php artisan test --filter=KanbanWorkflowTest` could not run because `vendor/autoload.php` is unavailable until Composer dependencies are installable.
+- Browser-based drag/drop and drawer checks could not be executed in this environment because Composer dependencies are unavailable and the Laravel app cannot boot.
 
 ### Next planned task
-Implement Kanban board with drag-and-drop and reorder.
+Implement timeline/Gantt view with deadlines and drag-resize planning.

@@ -3,6 +3,7 @@
 use App\Http\Controllers\BugController;
 use App\Http\Controllers\ClientController;
 use App\Http\Controllers\FeatureController;
+use App\Http\Controllers\KanbanController;
 use App\Http\Controllers\App\DashboardController;
 use App\Http\Controllers\App\PageController;
 use App\Http\Controllers\SoftwareController;
@@ -22,6 +23,10 @@ Route::middleware('auth')->group(function () {
 
     Route::patch('/softwares/{software}/toggle', [SoftwareController::class, 'toggle'])->name('softwares.toggle');
     Route::resource('softwares', SoftwareController::class)->only(['index', 'create', 'store', 'edit', 'update']);
+
+    Route::get('/kanban', [KanbanController::class, 'index'])->name('kanban.index');
+    Route::patch('/kanban/tickets/reorder', [KanbanController::class, 'reorder'])->name('kanban.tickets.reorder');
+    Route::patch('/kanban/tickets/{ticket}/move', [KanbanController::class, 'move'])->name('kanban.tickets.move');
 
     Route::get('/tickets/backlog', [TicketController::class, 'backlog'])->name('tickets.backlog');
     Route::patch('/tickets/{ticket}/classify', [TicketController::class, 'classify'])->name('tickets.classify');

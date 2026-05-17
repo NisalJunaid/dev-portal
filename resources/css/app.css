@@ -32,4 +32,16 @@
     .bug-card-drag {
         @apply rotate-1 cursor-grabbing;
     }
+
+    .kanban-card-ghost {
+        @apply border-indigo-300 bg-indigo-50 opacity-70;
+    }
+
+    .kanban-card-chosen {
+        @apply scale-[1.01] shadow-soft;
+    }
+
+    .kanban-card-drag {
+        @apply rotate-1 cursor-grabbing;
+    }
 }
