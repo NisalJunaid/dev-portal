@@ -7,12 +7,14 @@ use App\Models\Ticket;
 use App\Models\TicketComment;
 use App\Models\User;
 use App\Services\TicketActivityService;
+use App\Services\TicketBlockService;
 use App\Services\TimeTrackingService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\Response;
 
 class BugController extends Controller
@@ -26,6 +28,7 @@ class BugController extends Controller
     public function __construct(
         private readonly TicketActivityService $ticketActivityService,
         private readonly TimeTrackingService $timeTrackingService,
+        private readonly TicketBlockService $ticketBlockService,
     ) {
     }
 
@@ -56,7 +59,7 @@ class BugController extends Controller
     {
         $this->authorizeBugAccess($request, $ticket);
 
-        $ticket->load(['client', 'software', 'submitter', 'assignee', 'activities.user']);
+        $ticket->load(['client', 'software', 'submitter', 'assignee', 'activities.user', 'activeBlock.blocker']);
 
         return view('bugs.show', [
             'ticket' => $ticket,
@@ -65,6 +68,8 @@ class BugController extends Controller
             'softwares' => Software::with('client')->where('is_enabled', true)->orderBy('name')->get(),
             'canUpdateBugs' => $request->user()->can('update bugs'),
             'isKielUser' => $request->user()->isKielUser(),
+            'activeBlock' => $ticket->activeBlock,
+            'totalBlockedDuration' => $this->ticketBlockService->totalBlockedDurationForTicket($ticket),
         ]);
     }
 
@@ -80,7 +85,33 @@ class BugController extends Controller
 
     public function block(Request $request, Ticket $ticket): JsonResponse|RedirectResponse
     {
-        return $this->transition($request, $ticket, Ticket::STATUS_BUG_BLOCKED);
+        $this->authorizeBugAccess($request, $ticket);
+        abort_unless($request->user()->can('update bugs'), Response::HTTP_FORBIDDEN);
+
+        $validated = $request->validate([
+            'reason' => ['required', 'string', 'max:10000'],
+        ]);
+
+        $block = $this->ticketBlockService->block($ticket, $request->user(), $validated['reason']);
+        $ticket->refresh();
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'message' => 'Bug blocked.',
+                'ticket' => [
+                    'id' => $ticket->id,
+                    'status' => $ticket->status,
+                    'formatted_status' => $ticket->formattedStatus(),
+                ],
+                'block' => [
+                    'id' => $block->id,
+                    'reason' => $block->reason,
+                    'blocked_at' => $block->blocked_at?->toISOString(),
+                ],
+            ]);
+        }
+
+        return back()->with('status', 'Bug blocked.');
     }
 
     private function transition(Request $request, Ticket $ticket, string $newStatus): JsonResponse|RedirectResponse
@@ -88,6 +119,12 @@ class BugController extends Controller
         $this->authorizeBugAccess($request, $ticket);
         abort_unless($request->user()->can('update bugs'), Response::HTTP_FORBIDDEN);
         abort_unless($this->canTransition($ticket->status, $newStatus), Response::HTTP_UNPROCESSABLE_ENTITY, 'That bug status transition is not allowed.');
+
+        if ($ticket->isBlocked() && $newStatus !== $ticket->status) {
+            throw ValidationException::withMessages([
+                'status' => 'Use the Unblock button and provide a note to unblock tickets.',
+            ]);
+        }
 
         $oldStatus = $ticket->status;
 

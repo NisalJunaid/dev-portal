@@ -1,75 +1,67 @@
 # Implementation Tracker
 
-## Completed: Backend-only Kiel time tracking
+## Completed: Blocked/unblocked workflow
 
 ### Summary
-Implemented backend-backed Kiel time tracking for tickets with an internal timer panel on the ticket detail page. Kiel team members can now start, pause, resume, and stop independent timer sessions on a ticket without full page reloads, while client users remain unable to access timer data.
-
-### Time log lifecycle
-- `running`
-- `paused`
-- `completed`
+Implemented the blocked/unblocked ticket workflow with explicit block records, mandatory reasons/notes, automatic timer pauses, client-visible transparency, and Kiel-only block history on the ticket detail page.
 
 ### Database and model updates
-- Added `time_logs` table with ticket, user, client, software, start/pause/resume/end timestamps, accumulated duration, lifecycle status, timestamps, and reporting indexes.
-- Added `App\Models\TimeLog` with status constants, casts, active/completed scopes, ticket/user/client/software relationships, and live current-duration calculation.
-- Added `Ticket hasMany TimeLog`.
-- Added `User hasMany TimeLog`.
-- Added `Client hasMany TimeLog`.
-- Added `Software hasMany TimeLog`.
+- Added `ticket_blocks` table with ticket, blocker, reason, blocked/unblocked timestamps, unblocker, unblock note, calculated duration, timestamps, and lookup indexes.
+- Added `App\Models\TicketBlock` with casts, active scope, ticket/blocker/unblocker relationships, and live duration calculation for active blocks.
+- Added `Ticket hasMany TicketBlock` and active block relationship.
+- Added `User` relationships for tickets blocked and unblocked by that user.
 
 ### Service behavior
-- Added `TimeTrackingService` to own timer rules and duration calculations.
-- Starting a timer creates a running time log tied to the ticket, user, client, and software.
-- Pausing a timer adds elapsed running seconds to `duration_seconds`, clears active resume state, and marks the log paused.
-- Resuming a timer records the latest resume timestamp and returns the log to running.
-- Stopping a timer finalizes elapsed running time, records `ended_at`, and marks the log completed.
-- Prevents a user from starting more than one active timer for the same ticket.
-- Allows different Kiel team members to track separate sessions on the same ticket.
-- Calculates cumulative ticket time across completed and active logs.
-- Exposes a report query filterable by client, software, user, and started-at date range.
-- Automatically pauses running timers when a ticket is moved into a blocked status.
+- Added `TicketBlockService` to own block/unblock rules and duration calculations.
+- Blocking requires a non-empty reason and only Kiel users can block tickets.
+- Blocking creates an active `ticket_blocks` record and changes ticket status:
+  - bug tickets become `bug_blocked`
+  - feature tickets become `feature_blocked`
+- Blocking automatically pauses every running timer on the ticket through the existing time-tracking service.
+- Unblocking requires a non-empty unblock note.
+- Unblocking sets `unblocked_at`, records `unblocked_by`, stores `unblock_note`, and calculates `duration_seconds`.
+- Unblocking returns tickets to:
+  - `bug_pending` for bugs
+  - `in_progress` for features in an in-progress sprint
+  - `feature_approved` for non-sprint features
+- Timers remain paused after unblock; users must manually resume.
+- Manual ticket detail status edits can no longer newly move tickets into blocked statuses without the dedicated Block workflow.
 
 ### Controllers and routes
-- Added `TimeTrackingController` with JSON responses for AJAX timer operations.
+- Added `TicketBlockController` with JSON responses for AJAX block/unblock operations.
 - Authenticated routes added for:
-  - `POST /tickets/{ticket}/timer/start`
-  - `POST /tickets/{ticket}/timer/pause`
-  - `POST /tickets/{ticket}/timer/resume`
-  - `POST /tickets/{ticket}/timer/stop`
-- Timer routes are restricted to Kiel users.
-- Client users receive forbidden responses for timer route access.
+  - `POST /tickets/{ticket}/block`
+  - `POST /tickets/{ticket}/unblock`
+- Block/unblock routes are restricted to Kiel users.
+- Existing bug block endpoint now requires a reason and delegates to the block workflow.
 
 ### Ticket detail UI
-- Kiel users see a timer panel on `tickets.show`.
-- Client users do not see the timer panel or internal timer data.
-- Timer panel includes Start, Pause, Resume, and Stop actions.
-- Timer panel uses Alpine.js for live running duration.
-- Timer actions use `fetch` with JSON responses, CSRF headers, saving states, success messages, and error messages.
-- Ticket cumulative time updates after timer actions without a full page reload.
+- Ticket detail now shows a prominent blocked banner whenever a ticket is blocked.
+- Clients see the blocked status, latest block reason, and total blocked duration.
+- Client users still do not see internal timer data or Kiel-only block history.
+- Kiel users see a Blocked workflow panel with Block and Unblock buttons.
+- Block and unblock actions use modals for mandatory reason/note entry.
+- Block/unblock actions use `fetch` JSON requests and update the ticket detail page without a full page reload.
+- Kiel users see full block history with blocker, reason, unblocker, unblock note, timestamps, and durations.
 
 ### Activity logging
 - Logs ticket activity for:
-  - `timer started`
-  - `timer paused`
-  - `timer resumed`
-  - `timer stopped`
-- Automatic blocked-ticket timer pauses are logged as timer pause activity with an automatic-pause description.
+  - `blocked`
+  - `unblocked`
+  - `status changed` during block/unblock transitions
+- Running timers paused by blocking continue to log automatic timer pause activity.
 
 ### Verification performed
-- Added `TimeTrackingWorkflowTest` coverage for:
-  - Full start, pause, resume, and stop timer lifecycle.
-  - Duration accumulation across paused and resumed segments.
-  - Duplicate active timer prevention for the same user and ticket.
-  - Separate team member sessions on the same ticket.
-  - Cumulative ticket duration calculation.
-  - Report query filtering by client, software, user, and date range.
-  - Client users being unable to access timer routes or see the timer panel.
-  - Blocking a bug automatically pausing running timers.
-- PHP syntax checks passed for the time log model, time tracking service, time tracking controller, touched ticket and bug controllers, migration, routes, and time tracking workflow test.
+- Added `TicketBlockWorkflowTest` coverage for:
+  - Blocking requiring a reason.
+  - Blocking a ticket with a running timer and automatically pausing the timer.
+  - Client visibility of blocked status, latest reason, and total blocked duration without timer data or full block history.
+  - Unblocking requiring a note, setting duration, returning sprint features to `in_progress`, and keeping timers paused.
+- Updated the existing time-tracking blocked timer test to provide the now-mandatory block reason.
+- PHP syntax checks passed for the ticket block model, service, controller, migration, touched ticket/user/bug controllers and models, and workflow tests.
 - `composer install --no-interaction --prefer-dist` was attempted but Composer reported that `composer.lock` is missing required packages currently listed in `composer.json` (`spatie/laravel-permission` and `laravel/breeze`).
-- `php artisan test --filter=TimeTrackingWorkflowTest` was attempted but could not run because `vendor/autoload.php` is unavailable until Composer dependencies are installable.
-- Browser-based timer panel testing could not be executed in this environment because Composer dependencies are unavailable and the app cannot boot.
+- `php artisan test --filter=TicketBlockWorkflowTest` was attempted but could not run because `vendor/autoload.php` is unavailable until Composer dependencies are installable.
+- Browser-based block/unblock modal testing could not be executed in this environment because Composer dependencies are unavailable and the app cannot boot.
 
 ### Next planned task
-Implement blocked/unblocked workflow with automatic timer pause and transparency.
+Implement Asana-style list view with inline editing and filters.

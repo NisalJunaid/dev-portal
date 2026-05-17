@@ -25,6 +25,16 @@
                         <a href="{{ route('features.index') }}" class="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-bold text-slate-600">Back</a>
                     </div>
                     <p class="mt-6 whitespace-pre-line leading-7 text-slate-700">{{ $ticket->description }}</p>
+
+                    @if ($activeBlock)
+                        <div class="mt-6 rounded-2xl border border-rose-200 bg-rose-50 p-5">
+                            <div class="flex flex-wrap items-center justify-between gap-3">
+                                <p class="text-sm font-black uppercase tracking-wide text-rose-700">Blocked</p>
+                                <p class="text-xs font-black text-rose-700">Total blocked: {{ gmdate('H:i:s', $totalBlockedDuration) }}</p>
+                            </div>
+                            <p class="mt-2 whitespace-pre-line text-sm leading-6 text-rose-950">{{ $activeBlock->reason }}</p>
+                        </div>
+                    @endif
                 </section>
 
                 <section class="card">

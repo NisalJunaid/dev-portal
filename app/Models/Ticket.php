@@ -125,6 +125,16 @@ class Ticket extends Model
         return $this->hasMany(TimeLog::class);
     }
 
+    public function blocks(): HasMany
+    {
+        return $this->hasMany(TicketBlock::class);
+    }
+
+    public function activeBlock()
+    {
+        return $this->hasOne(TicketBlock::class)->whereNull('unblocked_at')->latestOfMany('blocked_at');
+    }
+
     public function sprints(): BelongsToMany
     {
         return $this->belongsToMany(Sprint::class, 'sprint_items')->withPivot('position')->withTimestamps();
@@ -158,5 +168,15 @@ class Ticket extends Model
     public function isCompletedFeature(): bool
     {
         return $this->status === self::STATUS_FEATURE_COMPLETED;
+    }
+
+    public function isBlocked(): bool
+    {
+        return in_array($this->status, [self::STATUS_BUG_BLOCKED, self::STATUS_FEATURE_BLOCKED], true);
+    }
+
+    public function totalBlockedDurationSeconds(): int
+    {
+        return (int) $this->blocks()->get()->sum(fn (TicketBlock $block) => $block->currentDurationSeconds());
     }
 }

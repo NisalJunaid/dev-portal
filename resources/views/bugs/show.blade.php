@@ -26,6 +26,16 @@
                         <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-black uppercase tracking-wide text-slate-700">Bug</span>
                     </div>
                     <p class="mt-6 whitespace-pre-line leading-7 text-slate-700">{{ $ticket->description }}</p>
+
+                    @if ($activeBlock)
+                        <div class="mt-6 rounded-2xl border border-rose-200 bg-rose-50 p-5">
+                            <div class="flex flex-wrap items-center justify-between gap-3">
+                                <p class="text-sm font-black uppercase tracking-wide text-rose-700">Blocked</p>
+                                <p class="text-xs font-black text-rose-700">Total blocked: {{ gmdate('H:i:s', $totalBlockedDuration) }}</p>
+                            </div>
+                            <p class="mt-2 whitespace-pre-line text-sm leading-6 text-rose-950">{{ $activeBlock->reason }}</p>
+                        </div>
+                    @endif
                 </section>
 
                 <section class="card">
@@ -72,8 +82,9 @@
                                 @csrf
                                 <button type="submit" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-black text-slate-700 shadow-sm transition hover:border-indigo-200 hover:text-indigo-700">Move to pending</button>
                             </form>
-                            <form method="POST" action="{{ route('bugs.block', $ticket) }}">
+                            <form method="POST" action="{{ route('bugs.block', $ticket) }}" class="space-y-2">
                                 @csrf
+                                <textarea name="reason" rows="3" required class="w-full rounded-2xl border-amber-200 text-sm shadow-sm focus:border-amber-500 focus:ring-amber-500" placeholder="Required block reason"></textarea>
                                 <button type="submit" class="w-full rounded-2xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-black text-amber-800 shadow-sm transition hover:bg-amber-100">Mark blocked</button>
                             </form>
                             <form method="POST" action="{{ route('bugs.complete', $ticket) }}">
