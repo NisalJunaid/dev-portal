@@ -1,67 +1,80 @@
 # Implementation Tracker
 
-## Completed: Blocked/unblocked workflow
+## Completed: Asana-style interactive ticket list view
 
 ### Summary
-Implemented the blocked/unblocked ticket workflow with explicit block records, mandatory reasons/notes, automatic timer pauses, client-visible transparency, and Kiel-only block history on the ticket detail page.
+Implemented a reusable Asana-style ticket/task list view for the Tickets index with rich search, filtering, sorting, pagination, badges, blocked and overdue indicators, and no-reload inline editing for Kiel operational users.
 
-### Database and model updates
-- Added `ticket_blocks` table with ticket, blocker, reason, blocked/unblocked timestamps, unblocker, unblock note, calculated duration, timestamps, and lookup indexes.
-- Added `App\Models\TicketBlock` with casts, active scope, ticket/blocker/unblocker relationships, and live duration calculation for active blocks.
-- Added `Ticket hasMany TicketBlock` and active block relationship.
-- Added `User` relationships for tickets blocked and unblocked by that user.
+### Reusable list UI
+- Added `resources/views/tickets/partials/list-view.blade.php` as the reusable ticket list component used by `tickets.index`.
+- The list shows:
+  - Ticket number
+  - Title
+  - Type
+  - Urgency
+  - Status
+  - Assigned to
+  - Client
+  - Software
+  - Start date
+  - Due date
+  - Sprint cycle
+  - Blocked indicator
+  - Last updated
+- Added smooth row hover styling for quick scanning.
+- Added urgency and status badges with color-coded states.
+- Added blocked/clear indicators per row.
+- Added overdue due-date highlighting for incomplete tickets.
 
-### Service behavior
-- Added `TicketBlockService` to own block/unblock rules and duration calculations.
-- Blocking requires a non-empty reason and only Kiel users can block tickets.
-- Blocking creates an active `ticket_blocks` record and changes ticket status:
-  - bug tickets become `bug_blocked`
-  - feature tickets become `feature_blocked`
-- Blocking automatically pauses every running timer on the ticket through the existing time-tracking service.
-- Unblocking requires a non-empty unblock note.
-- Unblocking sets `unblocked_at`, records `unblocked_by`, stores `unblock_note`, and calculates `duration_seconds`.
-- Unblocking returns tickets to:
-  - `bug_pending` for bugs
-  - `in_progress` for features in an in-progress sprint
-  - `feature_approved` for non-sprint features
-- Timers remain paused after unblock; users must manually resume.
-- Manual ticket detail status edits can no longer newly move tickets into blocked statuses without the dedicated Block workflow.
+### Search, filters, sorting, and pagination
+- Added server-side search across ticket number, title, client, software, and assignee.
+- Added filters for type, urgency, status, assignee, client, software, blocked state, and page size.
+- Added sortable table headers for all displayed columns, including related client/software/assignee data and sprint cycle.
+- Pagination preserves the active query string so users do not lose filters or sorting while paging.
 
-### Controllers and routes
-- Added `TicketBlockController` with JSON responses for AJAX block/unblock operations.
-- Authenticated routes added for:
-  - `POST /tickets/{ticket}/block`
-  - `POST /tickets/{ticket}/unblock`
-- Block/unblock routes are restricted to Kiel users.
-- Existing bug block endpoint now requires a reason and delegates to the block workflow.
+### Inline editing
+- Added Alpine.js inline editing for Kiel users on:
+  - Title
+  - Urgency
+  - Assigned user
+  - Start date
+  - Due date
+  - Status, limited to statuses valid for the ticket type
+- Inline edits use the Fetch API and do not trigger full-page reloads.
+- Each editable field has a per-field saving indicator.
+- Successful saves show a green success state.
+- Failed saves show an error state and immediately revert the edited value to the last saved value.
+- The row updates returned display data after a successful save, including badge values, blocked state, overdue state, assignee label, and last-updated timestamp.
 
-### Ticket detail UI
-- Ticket detail now shows a prominent blocked banner whenever a ticket is blocked.
-- Clients see the blocked status, latest block reason, and total blocked duration.
-- Client users still do not see internal timer data or Kiel-only block history.
-- Kiel users see a Blocked workflow panel with Block and Unblock buttons.
-- Block and unblock actions use modals for mandatory reason/note entry.
-- Block/unblock actions use `fetch` JSON requests and update the ticket detail page without a full page reload.
-- Kiel users see full block history with blocker, reason, unblocker, unblock note, timestamps, and durations.
+### Endpoint and permissions
+- Added authenticated route: `PATCH /tickets/{ticket}/inline-update`.
+- Added `TicketController::inlineUpdate` to:
+  - Check the user can view tickets and can access the ticket client scope.
+  - Deny client users from inline-editing operational fields.
+  - Validate the requested field name against the explicit inline-edit allowlist.
+  - Validate each field value according to field-specific rules.
+  - Prevent newly moving a ticket into a blocked status through inline status edits; users must still use the Block workflow with a reason.
+  - Save the update in a database transaction.
+  - Log ticket activity when values change.
+  - Return a JSON payload with normalized values and presentation labels.
 
-### Activity logging
-- Logs ticket activity for:
-  - `blocked`
-  - `unblocked`
-  - `status changed` during block/unblock transitions
-- Running timers paused by blocking continue to log automatic timer pause activity.
+### Client restrictions
+- Client users can view their scoped tickets but do not receive inline operational controls in the list.
+- Client users attempting to call the inline update endpoint receive `403 Forbidden` and the ticket remains unchanged.
+- Client contribution paths remain through existing comment/recommendation workflows rather than operational inline fields.
 
 ### Verification performed
-- Added `TicketBlockWorkflowTest` coverage for:
-  - Blocking requiring a reason.
-  - Blocking a ticket with a running timer and automatically pausing the timer.
-  - Client visibility of blocked status, latest reason, and total blocked duration without timer data or full block history.
-  - Unblocking requiring a note, setting duration, returning sprint features to `in_progress`, and keeping timers paused.
-- Updated the existing time-tracking blocked timer test to provide the now-mandatory block reason.
-- PHP syntax checks passed for the ticket block model, service, controller, migration, touched ticket/user/bug controllers and models, and workflow tests.
-- `composer install --no-interaction --prefer-dist` was attempted but Composer reported that `composer.lock` is missing required packages currently listed in `composer.json` (`spatie/laravel-permission` and `laravel/breeze`).
-- `php artisan test --filter=TicketBlockWorkflowTest` was attempted but could not run because `vendor/autoload.php` is unavailable until Composer dependencies are installable.
-- Browser-based block/unblock modal testing could not be executed in this environment because Composer dependencies are unavailable and the app cannot boot.
+- Added `TicketInlineUpdateTest` coverage for:
+  - Kiel inline updates for title, urgency, assigned user, start date, due date, and status.
+  - Activity logging for inline updates.
+  - Invalid inline field names.
+  - Invalid inline values.
+  - Blocking-status protection through inline status edits.
+  - Client users being forbidden from inline operational updates.
+- PHP syntax checks passed for the updated ticket controller, routes, and new inline update test.
+- `composer install --no-interaction --prefer-dist` was attempted but Composer reported that `composer.lock` is missing required packages currently listed in `composer.json` (`spatie/laravel-permission` and `laravel/breeze`), leaving `vendor/autoload.php` unavailable.
+- `php artisan test --filter=TicketInlineUpdateTest` was attempted but could not run because `vendor/autoload.php` is unavailable until Composer dependencies are installable.
+- Browser-based end-to-end inline editing could not be executed in this environment because Composer dependencies are unavailable and the Laravel app cannot boot.
 
 ### Next planned task
-Implement Asana-style list view with inline editing and filters.
+Implement Kanban board with drag-and-drop and reorder.
