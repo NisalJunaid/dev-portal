@@ -1,72 +1,22 @@
 <x-app-layout>
-    <x-slot name="header">Sprints</x-slot>
-    <div x-data="sprintDashboard(@js([
-        'currentSprintId' => $currentSprint?->id,
-        'elapsed' => $currentSprintStats['elapsed_seconds'] ?? 0,
-        'running' => $currentSprint?->timer_status === \App\Models\Sprint::TIMER_RUNNING,
-    ]))" class="space-y-4">
-        <div class="flex items-center justify-between gap-3">
-            <h2 class="text-xl font-black">Sprints</h2>
-            <div class="flex items-center gap-2">
-                <button type="button" class="rounded-lg border px-3 py-2 text-sm" @click="openCreateFeatureDrawer()">New Feature Request</button>
-                @if(!$currentSprint && $approvedFeatures->isNotEmpty() && $isKielUser)
-                    <button type="button" class="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-bold text-white" @click="startSprint">Start Sprint</button>
-                @endif
-            </div>
-        </div>
+<x-slot name="header">Sprints</x-slot>
+<div x-data="sprintDashboard({selectedClientId:@js($selectedClientId),canStartSprint:@js($canStartSprint),startUrl:@js(route('sprints.start.store')),sectionsUrl:@js(route('sprints.dashboard-sections')),elapsed:@js($currentSprintStats['elapsed_seconds'] ?? 0),running:@js(($currentSprintStats['timer_status'] ?? null)===\App\Models\Sprint::TIMER_RUNNING)})" class="space-y-4">
+  <div class="flex items-center justify-end gap-2">
+    @if($isKielUser)
+      <form method="GET"><select name="client_id" onchange="this.form.submit()" class="rounded-lg border border-slate-200 px-2 py-1.5 text-sm"><option value="">Select client</option>@foreach($clients as $c)<option value="{{ $c->id }}" @selected($selectedClientId===$c->id)>{{ $c->name }}</option>@endforeach</select></form>
+    @endif
+    <button type="button" class="rounded-lg border px-3 py-2 text-sm" @click="openCreateFeatureDrawer()">Feature Request</button>
+    <button type="button" class="sprint-icon-button" :disabled="startingSprint||!canStartSprint" :title="!selectedClientId ? 'Select a client before starting a sprint.' : (!canStartSprint ? 'No approved features are ready for this sprint.' : 'Start sprint')" @click="startSprint">▶<span class="sr-only">Start sprint</span></button>
+  </div>
 
-        <section class="card p-4">
-            <div class="flex items-center justify-between">
-                <div>
-                    <h3 class="font-black">Current Sprint</h3>
-                    @if($currentSprint)
-                        <p class="text-sm">{{ $currentSprint->name }} · {{ $currentSprint->client->name }} · <span x-text="formattedTimer"></span></p>
-                    @else
-                        <p class="text-sm text-slate-500">No active sprint.</p>
-                    @endif
-                </div>
-                @if($currentSprint && $isKielUser)
-                    <div class="flex items-center gap-2">
-                        <button x-show="running" @click="pauseSprint({{ $currentSprint->id }})" title="Pause sprint" class="rounded-full border px-3 py-1">⏸</button>
-                        <button x-show="!running" @click="resumeSprint({{ $currentSprint->id }})" title="Resume sprint" class="rounded-full border px-3 py-1">▶</button>
-                        <button @click="endSprint({{ $currentSprint->id }})" title="End sprint" class="rounded-full border px-3 py-1">⏹</button>
-                    </div>
-                @endif
-            </div>
-        </section>
-
-        <section class="card p-4">
-            <h3 class="font-black mb-3">Approved for Current Sprint</h3>
-            <table class="min-w-full text-sm"><thead><tr class="text-left"><th>Feature</th><th>Software</th><th>Status</th><th>Approved</th></tr></thead><tbody>
-                @forelse($approvedFeatures as $feature)
-                    <tr><td>{{ $feature->ticket_no }} · {{ $feature->title }}</td><td>{{ $feature->software?->name }}</td><td>{{ $feature->formattedStatus() }}</td><td>
-                        @if($isKielUser)
-                        <button type="button" @click="removeFromSprint({{ $feature->id }})" class="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-black text-white">On</button>
-                        @else <span class="text-xs rounded-full bg-emerald-100 px-2 py-1">Approved for sprint</span> @endif
-                    </td></tr>
-                @empty <tr><td colspan="4" class="text-slate-500">No approved features.</td></tr>
-                @endforelse
-            </tbody></table>
-        </section>
-
-        <section class="card p-4">
-            <h3 class="font-black mb-3">Future Feature Request Backlog</h3>
-            <table class="min-w-full text-sm"><thead><tr class="text-left"><th>Feature</th><th>Software</th><th>Status</th><th>Action</th></tr></thead><tbody>
-                @forelse($futureFeatures as $feature)
-                <tr><td>{{ $feature->ticket_no }} · {{ $feature->title }}</td><td>{{ $feature->software?->name }}</td><td>{{ $feature->formattedStatus() }}</td><td>
-                    @if($isKielUser)
-                    <button type="button" @click="approveForSprint({{ $feature->id }})" class="inline-flex items-center gap-2 rounded-full bg-slate-700 px-3 py-1.5 text-xs font-black text-white">Off</button>
-                    @elseif($feature->status===\App\Models\Ticket::STATUS_FEATURE_APPROVED)
-                    <form method="POST" action="{{ route('features.recommend',$feature) }}">@csrf<button class="text-xs text-indigo-700">Recommend</button></form>
-                    @else <span class="text-xs">Recommended</span> @endif
-                </td></tr>
-                @empty <tr><td colspan="4" class="text-slate-500">No backlog features.</td></tr>
-                @endforelse
-            </tbody></table>
-        </section>
-        @include('tasks.partials.create-feature-drawer')
-    </div>
+  <div id="current-sprint-wrap">@include('sprints.partials.current-sprint')</div>
+  <div id="approved-features-wrap">@include('sprints.partials.approved-features-table')</div>
+  <div id="future-features-wrap">@include('sprints.partials.future-features-table')</div>
+  <div id="history-wrap">@include('sprints.partials.history-table')</div>
+  @include('tasks.partials.create-feature-drawer')
+  @include('tickets.partials.drawer')
+</div>
 <script>
-function sprintDashboard(config){return{elapsed:config.elapsed||0,running:!!config.running,tick:null,get formattedTimer(){const s=this.elapsed;const h=String(Math.floor(s/3600)).padStart(2,'0');const m=String(Math.floor((s%3600)/60)).padStart(2,'0');const sec=String(s%60).padStart(2,'0');return `${h}:${m}:${sec}`;},init(){if(this.running){this.startTick();}},startTick(){clearInterval(this.tick);this.tick=setInterval(()=>{if(this.running)this.elapsed++;},1000);},openCreateFeatureDrawer(){this.createFeatureDrawerOpen=true;},createFeatureDrawerOpen:false,createFeatureForm:{title:'',description:'',software_id:'',urgency:'',parent_ticket_id:''},closeCreateFeatureDrawer(){this.createFeatureDrawerOpen=false;},async submitCreateFeature(){try{await window.Kiel.request("{{ route('features.request.store') }}",{method:'POST',body:JSON.stringify(this.createFeatureForm)});window.Kiel.toast('Feature request created.');location.reload();}catch(e){window.Kiel.toast(e.message,'error')}},async approveForSprint(id){await window.Kiel.request(`/features/${id}/approve-next-sprint`,{method:'POST'});window.Kiel.toast('Approved.');location.reload();},async removeFromSprint(id){await window.Kiel.request(`/features/${id}/remove-from-sprint`,{method:'PATCH'});window.Kiel.toast('Removed from sprint queue.');location.reload();},async startSprint(){await window.Kiel.request("{{ route('sprints.start.store') }}",{method:'POST',body:JSON.stringify({client_id:"{{ ($filters['client_id'] ?? auth()->user()->client_id) }}"})});window.Kiel.toast('Sprint started.');location.reload();},pauseSprint(id){window.Kiel.request(`/sprints/${id}/pause`,{method:'PATCH'}).then(()=>{this.running=false;window.Kiel.toast('Sprint paused.');});},resumeSprint(id){window.Kiel.request(`/sprints/${id}/resume`,{method:'PATCH'}).then(()=>{this.running=true;window.Kiel.toast('Sprint resumed.');});},endSprint(id){window.Kiel.request(`/sprints/${id}/end`,{method:'PATCH'}).then(()=>{this.running=false;window.Kiel.toast('Sprint ended.');location.reload();});}}}
+function sprintDashboard(c){return{...c,loadingFeatureId:null,startingSprint:false,running:!!c.running,elapsed:c.elapsed||0,tick:null,get formattedTimer(){const s=this.elapsed,h=String(Math.floor(s/3600)).padStart(2,'0'),m=String(Math.floor((s%3600)/60)).padStart(2,'0'),sec=String(s%60).padStart(2,'0');return `${h}:${m}:${sec}`},init(){if(this.running)this.startTick()},startTick(){clearInterval(this.tick);this.tick=setInterval(()=>{if(this.running)this.elapsed++},1000)},createFeatureDrawerOpen:false,createFeatureForm:{title:'',description:'',software_id:'',urgency:'',parent_ticket_id:''},openCreateFeatureDrawer(){this.createFeatureDrawerOpen=true},closeCreateFeatureDrawer(){this.createFeatureDrawerOpen=false},async refreshSections(){const q=this.selectedClientId?`?client_id=${this.selectedClientId}`:'';const d=await window.Kiel.request(`${this.sectionsUrl}${q}`);document.getElementById('current-sprint-wrap').innerHTML=d.current_sprint_html;document.getElementById('approved-features-wrap').innerHTML=d.approved_features_html;document.getElementById('future-features-wrap').innerHTML=d.future_features_html;document.getElementById('history-wrap').innerHTML=d.history_html;this.elapsed=d.stats?.elapsed_seconds||0;this.running=(d.stats?.timer_status==='running');if(this.running)this.startTick();window.Kiel.initializeTicketDrawer?.();},async submitCreateFeature(){try{await window.Kiel.request("{{ route('features.request.store') }}",{method:'POST',body:JSON.stringify(this.createFeatureForm)});window.Kiel.toast('Feature request created.');await this.refreshSections();this.closeCreateFeatureDrawer();}catch(e){window.Kiel.toast(e.message,'error')}},async approveForSprint(id,url){this.loadingFeatureId=id;try{await window.Kiel.request(url,{method:'POST'});window.Kiel.toast('Feature approved for sprint.');await this.refreshSections();}catch(e){window.Kiel.toast(e.message,'error')}finally{this.loadingFeatureId=null}},async removeFromSprint(id,url){this.loadingFeatureId=id;try{await window.Kiel.request(url,{method:'PATCH'});window.Kiel.toast('Feature removed from sprint queue.');await this.refreshSections();}catch(e){window.Kiel.toast(e.message,'error')}finally{this.loadingFeatureId=null}},async startSprint(){if(!this.selectedClientId){window.Kiel.toast('Select a client before starting a sprint.','error');return;}if(!this.canStartSprint){window.Kiel.toast('No approved features are ready for this sprint.','error');return;}this.startingSprint=true;try{await window.Kiel.request(this.startUrl,{method:'POST',body:JSON.stringify({client_id:this.selectedClientId})});window.Kiel.toast('Sprint started.');await this.refreshSections();}catch(e){window.Kiel.toast(e.message,'error')}finally{this.startingSprint=false}},async pauseSprint(id){await window.Kiel.request(`/sprints/${id}/pause`,{method:'PATCH'});this.running=false;window.Kiel.toast('Sprint paused.');await this.refreshSections();},async resumeSprint(id){await window.Kiel.request(`/sprints/${id}/resume`,{method:'PATCH'});this.running=true;window.Kiel.toast('Sprint resumed.');await this.refreshSections();},async endSprint(id){await window.Kiel.request(`/sprints/${id}/end`,{method:'PATCH'});this.running=false;window.Kiel.toast('Sprint ended.');await this.refreshSections();}}}
 </script>
 </x-app-layout>
