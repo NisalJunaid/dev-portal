@@ -1,73 +1,76 @@
 # Implementation Tracker
 
-## Completed: Asana-style Kanban board
+## Completed: Asana-style Timeline view
 
 ### Summary
-Implemented a dedicated Asana-style Kanban board using SortableJS for drag-and-drop planning across all tickets, bugs, features, and sprint task views. The board supports status moves, same-column priority reordering, autosave feedback, invalid-transition rejection with visual revert behavior, toast messaging, and a right-side ticket details drawer.
+Implemented a dedicated Asana-style Timeline/Gantt planning view. DHTMLX Gantt was attempted first, but the npm registry returned `403 Forbidden`; Frappe Gantt was also unavailable through npm for the same reason, so the implementation uses the Frappe Gantt CDN fallback pattern for Laravel Blade, Alpine.js, and Tailwind.
 
-### Kanban views
-- Added a new `Kanban` navigation item and authenticated `/kanban` page.
-- Added board tabs for:
-  - All tickets
-  - Bugs
-  - Features
-  - Sprint tasks
-- Added board-specific columns:
-  - All tickets: Backlog, Recommended, Next Sprint, In Progress, Blocked, Completed, Rejected
-  - Bugs: Pending, Blocked, Completed
-  - Features: Approved, Recommended, Next Sprint, In Progress, Blocked, Completed
-  - Sprint tasks: Approved, Recommended, Next Sprint, In Progress, Blocked, Completed
+### Timeline view
+- Added a new authenticated `/timeline` page backed by a real `TimelineController` instead of the previous placeholder page.
+- Added a Frappe Gantt chart area that renders scheduled tickets as horizontal bars using each ticket's `start_date` and `due_date`.
+- Added smooth loading state, empty state, and success/error toast messaging.
+- Added urgency-based bar colors, blocked styling, and overdue styling.
+- Added read-only messaging for clients and editing-enabled messaging for Kiel users.
 
-### Cards and drawer
-- Each Kanban card now shows:
-  - Ticket number
-  - Title
-  - Urgency
-  - Assignee
-  - Due date
+### Filters
+- Added Timeline filters for:
   - Client
   - Software
-  - Blocked badge when applicable
-- Clicking a card opens a right-side drawer with ticket details and a link to the full ticket page.
+  - Sprint
+  - Assignee, including Unassigned
+  - Urgency
+  - Status
+- Client users remain scoped to their own client data when viewing timeline data and filter options.
 
-### Drag-and-drop behavior
-- Added SortableJS-powered drag between columns.
-- Added SortableJS-powered reorder within the same column.
-- Added “Saving…” badges while move and reorder requests are in flight.
-- Added success and error toasts.
-- Invalid status transitions are rejected by the API and the client-side card is visually reverted to its original location.
+### Task metadata and drawer
+- Timeline task payloads now include:
+  - Ticket number and title
+  - Assignee
+  - Status
+  - Urgency
+  - Blocked indicator
+  - Overdue indicator
+  - Client
+  - Software
+  - Dependency label
+  - Full ticket URL
+- Added a right-side task drawer for timeline task review.
+- Added drawer controls for setting or clearing a task dependency when the user can edit the timeline.
 
 ### Endpoints and service layer
-- Added authenticated endpoint: `PATCH /kanban/tickets/{ticket}/move`.
-- Added authenticated endpoint: `PATCH /kanban/tickets/reorder`.
-- Added `KanbanService` to:
-  - Build board columns and visible ticket queries per view.
-  - Validate board-compatible status transitions.
-  - Enforce Kiel/client permission rules.
-  - Update ticket status.
-  - Update `priority_order`.
-  - Log Kanban move/reorder activity.
-  - Return normalized updated ticket JSON for UI refreshes.
+- Added authenticated endpoint: `GET /timeline`.
+- Added authenticated endpoint: `GET /timeline/data`.
+- Added authenticated endpoint: `PATCH /timeline/tasks/{ticket}/dates`.
+- Added authenticated endpoint: `PATCH /timeline/tasks/{ticket}/dependency`.
+- Added `TimelineService` to:
+  - Build Frappe Gantt-compatible JSON payloads.
+  - Enforce Kiel/client visibility rules.
+  - Restrict date and dependency edits to Kiel users.
+  - Validate and update drag/resize date changes.
+  - Validate and update task dependencies.
+  - Prevent circular dependencies.
+  - Log timeline date and dependency activity.
 
 ### Permission rules
-- Kiel users can move tickets to statuses allowed by the active board and ticket type.
-- Client users can recommend eligible feature tickets by moving approved features to Recommended.
-- Client users are blocked from moving bugs or internal workflow statuses.
-- Client users remain scoped to tickets for their own client.
+- Kiel users can view, drag, resize, and update dependencies.
+- Client users with `view timeline` can view their own client's timeline but cannot edit dates or dependencies.
+- Cross-client timeline data remains hidden from client users.
 
 ### Verification performed
-- Added `KanbanWorkflowTest` coverage for:
-  - Kanban page rendering for SortableJS columns and the right-side drawer.
-  - Kiel user drag/status move.
-  - Kiel user reorder autosave.
-  - Invalid drag/status transition rejection.
-  - Client user recommendation allowance.
-  - Client user internal workflow rejection.
-- PHP syntax checks passed for the new controller, service, views, route file, and test.
-- `npm install sortablejs --save-dev` was attempted, but the registry returned `403 Forbidden`; the board uses the existing CDN SortableJS loading pattern already present in the application.
+- Added `TimelineWorkflowTest` coverage for:
+  - Timeline page rendering, filter bar, loading state, empty state, Frappe Gantt loading, and right-side drawer.
+  - Frappe Gantt JSON task formatting.
+  - Filter behavior across client, software, sprint, assignee, urgency, and status.
+  - Kiel drag date changes and resize deadline changes through the date update endpoint.
+  - Client edit rejection.
+  - Date-order validation.
+  - Dependency creation.
+  - Circular dependency rejection.
+- PHP syntax checks passed for the Timeline controller, service, routes, and feature test.
 - `npm run build` passed successfully.
-- `php artisan test --filter=KanbanWorkflowTest` could not run because `vendor/autoload.php` is unavailable until Composer dependencies are installable.
-- Browser-based drag/drop and drawer checks could not be executed in this environment because Composer dependencies are unavailable and the Laravel app cannot boot.
+- `npm install dhtmlx-gantt --save-dev` and `npm install frappe-gantt --save-dev` were attempted, but the registry returned `403 Forbidden`; the Timeline view uses the Frappe Gantt CDN fallback.
+- `php artisan test --filter=TimelineWorkflowTest` could not run because `vendor/autoload.php` is unavailable until Composer dependencies are installable.
+- Browser-based drag/drop and resize checks could not be executed in this environment because Composer dependencies are unavailable and the Laravel app cannot boot.
 
 ### Next planned task
-Implement timeline/Gantt view with deadlines and drag-resize planning.
+Implement right-side task drawer and unified ticket detail interactions.
