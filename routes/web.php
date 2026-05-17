@@ -4,6 +4,7 @@ use App\Http\Controllers\BugController;
 use App\Http\Controllers\ClientController;
 use App\Http\Controllers\FeatureController;
 use App\Http\Controllers\KanbanController;
+use App\Http\Controllers\TimelineController;
 use App\Http\Controllers\App\DashboardController;
 use App\Http\Controllers\App\PageController;
 use App\Http\Controllers\SoftwareController;
@@ -25,6 +26,10 @@ Route::middleware('auth')->group(function () {
     Route::resource('softwares', SoftwareController::class)->only(['index', 'create', 'store', 'edit', 'update']);
 
     Route::get('/kanban', [KanbanController::class, 'index'])->name('kanban.index');
+    Route::get('/timeline', [TimelineController::class, 'index'])->name('timeline.index');
+    Route::get('/timeline/data', [TimelineController::class, 'data'])->name('timeline.data');
+    Route::patch('/timeline/tasks/{ticket}/dates', [TimelineController::class, 'dates'])->name('timeline.tasks.dates');
+    Route::patch('/timeline/tasks/{ticket}/dependency', [TimelineController::class, 'dependency'])->name('timeline.tasks.dependency');
     Route::patch('/kanban/tickets/reorder', [KanbanController::class, 'reorder'])->name('kanban.tickets.reorder');
     Route::patch('/kanban/tickets/{ticket}/move', [KanbanController::class, 'move'])->name('kanban.tickets.move');
 
@@ -63,7 +68,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/sprints/start', [SprintController::class, 'start'])->name('sprints.start.store');
     Route::post('/sprints/{sprint}/complete', [SprintController::class, 'complete'])->name('sprints.complete');
 
-    foreach (['timeline', 'reports', 'settings'] as $section) {
+    foreach (['reports', 'settings'] as $section) {
         Route::get('/'.$section, PageController::class)
             ->defaults('section', $section)
             ->name($section.'.index');
