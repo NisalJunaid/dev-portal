@@ -429,3 +429,27 @@ Production hardening and deployment preparation.
 
 ### Next planned task
 Production hardening and deployment preparation.
+
+## Completed: Sprints page table-first UX and sprint controls refresh
+
+### Summary
+- Refactored `/sprints` dashboard into compact task-list-like toolbar + panel/table layout.
+- Feature rows now open the ticket drawer from the Sprints page.
+- Fixed Start Sprint client selection behavior by introducing explicit `selectedClientId` and `canStartSprint` server payload.
+- Converted Start Sprint to icon-style control with disabled-state tooltips.
+- Redesigned Current Sprint section to include timer, status, and task summary metrics.
+- Wired pause/resume/end sprint controls with no-reload partial section refresh.
+- Added styled approval switches for approve/remove sprint queue transitions.
+- Added dashboard partial-refresh endpoint (`sprints.dashboard-sections`) for smooth AJAX updates after sprint/feature actions.
+
+### Checks run
+- `php artisan test`
+- `php artisan route:list`
+- `php artisan view:clear`
+- `php artisan optimize:clear`
+
+### Known issues
+- If vendor dependencies are unavailable in a target environment, artisan/test command execution may fail before Laravel boot.
+
+### Next planned task
+Production hardening and deployment preparation.

@@ -71,6 +71,7 @@ Route::middleware('auth')->group(function () {
     Route::patch('/features/{ticket}/remove-from-sprint', [FeatureController::class, 'removeFromSprint'])->name('features.remove-from-sprint');
 
     Route::get('/sprints', [SprintController::class, 'index'])->name('sprints.index');
+    Route::get('/sprints/dashboard-sections', [SprintController::class, 'dashboardSections'])->name('sprints.dashboard-sections');
     Route::get('/sprints/start', [SprintController::class, 'startForm'])->name('sprints.start');
     Route::get('/sprints/{sprint}', [SprintController::class, 'show'])->name('sprints.show');
     Route::post('/sprints/start', [SprintController::class, 'start'])->name('sprints.start.store');

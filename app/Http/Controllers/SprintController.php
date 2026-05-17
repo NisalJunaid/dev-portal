@@ -26,40 +26,115 @@ class SprintController extends Controller
     {
         abort_unless($request->user()->can('view sprints'), Response::HTTP_FORBIDDEN);
 
+        $data = $this->dashboardData($request);
+
+        return view('sprints.index', $data);
+    }
+
+    public function dashboardSections(Request $request): JsonResponse
+    {
+        abort_unless($request->user()->can('view sprints'), Response::HTTP_FORBIDDEN);
+
+        $data = $this->dashboardData($request);
+
+        return response()->json([
+            'current_sprint_html' => view('sprints.partials.current-sprint', $data)->render(),
+            'approved_features_html' => view('sprints.partials.approved-features-table', $data)->render(),
+            'future_features_html' => view('sprints.partials.future-features-table', $data)->render(),
+            'history_html' => view('sprints.partials.history-table', $data)->render(),
+            'stats' => $data['currentSprintStats'] ?? null,
+        ]);
+    }
+
+    private function dashboardData(Request $request): array
+    {
         $validated = $request->validate([
             'client_id' => ['nullable', Rule::exists('clients', 'id')],
             'status' => ['nullable', Rule::in(Sprint::STATUSES)],
         ]);
 
-        $query = Sprint::query()
+        $isKielUser = $request->user()->isKielUser();
+        $clients = Client::orderBy('name')->get();
+
+        $selectedClientId = null;
+        if (! $isKielUser) {
+            $selectedClientId = $request->user()->client_id;
+        } elseif (! empty($validated['client_id'])) {
+            $selectedClientId = (int) $validated['client_id'];
+        } else {
+            $approvedClientIds = Ticket::query()->where('type', Ticket::TYPE_FEATURE)->where('status', Ticket::STATUS_NEXT_SPRINT)->distinct()->pluck('client_id')->filter();
+            if ($approvedClientIds->count() === 1) {
+                $selectedClientId = (int) $approvedClientIds->first();
+            }
+        }
+
+        $featureQuery = Ticket::query()->with(['software', 'submitter', 'assignee', 'parent'])->where('type', Ticket::TYPE_FEATURE)
+            ->when($selectedClientId, fn ($q) => $q->where('client_id', $selectedClientId));
+
+        if (! $isKielUser) {
+            $featureQuery->where('client_id', $request->user()->client_id);
+        }
+
+        $approvedFeatures = (clone $featureQuery)->where('status', Ticket::STATUS_NEXT_SPRINT)->latest('updated_at')->get();
+        $futureFeatures = (clone $featureQuery)->whereIn('status', [Ticket::STATUS_FEATURE_APPROVED, Ticket::STATUS_RECOMMENDED])->latest('updated_at')->get();
+
+        $canStartSprint = (bool) $selectedClientId && $approvedFeatures->isNotEmpty();
+
+        $sprintQuery = Sprint::query()
             ->with(['client', 'software', 'starter', 'ender'])
             ->withCount('items')
-            ->when(! $request->user()->isKielUser(), fn ($query) => $query->where('client_id', $request->user()->client_id))
-            ->when(($validated['client_id'] ?? null) && $request->user()->isKielUser(), fn ($query, $clientId) => $query->where('client_id', $clientId))
-            ->when($validated['status'] ?? null, fn ($query, $status) => $query->where('status', $status))
+            ->when(! $isKielUser, fn ($q) => $q->where('client_id', $request->user()->client_id))
+            ->when(($validated['status'] ?? null), fn ($q, $status) => $q->where('status', $status))
+            ->when($selectedClientId, fn ($q) => $q->where('client_id', $selectedClientId))
             ->latest('started_at')
             ->latest('created_at');
 
-        $scopeClientId = ($validated['client_id'] ?? null) ?: (! $request->user()->isKielUser() ? $request->user()->client_id : null);
-        $featureQuery = Ticket::query()->with(['software','submitter','parent'])->where('type', Ticket::TYPE_FEATURE)
-            ->when($scopeClientId, fn($q,$cid)=>$q->where('client_id',$cid))
-            ->when(! $scopeClientId && ! $request->user()->isKielUser(), fn($q)=>$q->where('client_id',$request->user()->client_id));
+        $activeSprints = Sprint::query()
+            ->with('client')
+            ->where('status', Sprint::STATUS_IN_PROGRESS)
+            ->when(! $isKielUser, fn ($q) => $q->where('client_id', $request->user()->client_id))
+            ->when($isKielUser && $selectedClientId, fn ($q) => $q->where('client_id', $selectedClientId))
+            ->latest('started_at')
+            ->get();
 
-        $currentSprint = Sprint::query()->with('client')->where('status', Sprint::STATUS_IN_PROGRESS)->when($scopeClientId, fn($q,$cid)=>$q->where('client_id',$cid))->latest('started_at')->first();
+        $currentSprint = $activeSprints->first();
+
         $currentSprintStats = null;
-        if ($currentSprint) { $currentSprint->load('tickets'); $done=$currentSprint->tickets->filter(fn(Ticket $t)=>$t->isDone())->count(); $total=$currentSprint->tickets->count(); $currentSprintStats=['total_tasks'=>$total,'completed_tasks'=>$done,'incomplete_tasks'=>$total-$done,'elapsed_seconds'=>$currentSprint->elapsedSeconds()]; }
+        if ($currentSprint) {
+            $currentSprint->load('tickets');
+            $total = $currentSprint->tickets->count();
+            $completed = $currentSprint->tickets->filter(fn (Ticket $ticket) => method_exists($ticket, 'isDone') ? $ticket->isDone() : in_array($ticket->status, [Ticket::STATUS_BUG_COMPLETED, Ticket::STATUS_FEATURE_COMPLETED, 'task_completed'], true))->count();
+            $inProgress = $currentSprint->tickets->where('status', Ticket::STATUS_IN_PROGRESS)->count();
+            $backlog = $currentSprint->tickets->where('status', Ticket::STATUS_BACKLOG)->count();
+            $blocked = $currentSprint->tickets->filter(fn (Ticket $ticket) => $ticket->isBlocked())->count();
+            $remaining = max(0, $total - $completed);
 
-        return view('sprints.index', [
-            'sprints' => $query->where('status', Sprint::STATUS_COMPLETED)->paginate(12)->withQueryString(),
-            'approvedFeatures' => (clone $featureQuery)->where('status', Ticket::STATUS_NEXT_SPRINT)->latest('updated_at')->get(),
-            'futureFeatures' => (clone $featureQuery)->whereIn('status', [Ticket::STATUS_FEATURE_APPROVED, Ticket::STATUS_RECOMMENDED])->latest('updated_at')->get(),
+            $currentSprintStats = [
+                'total_tasks' => $total,
+                'completed_tasks' => $completed,
+                'in_progress_tasks' => $inProgress,
+                'backlog_tasks' => $backlog,
+                'blocked_tasks' => $blocked,
+                'remaining_tasks' => $remaining,
+                'elapsed_seconds' => $currentSprint->elapsedSeconds(),
+                'timer_status' => $currentSprint->timer_status,
+            ];
+        }
+
+        return [
+            'sprints' => $sprintQuery->where('status', Sprint::STATUS_COMPLETED)->paginate(12)->withQueryString(),
+            'approvedFeatures' => $approvedFeatures,
+            'futureFeatures' => $futureFeatures,
             'currentSprint' => $currentSprint,
+            'activeSprints' => $activeSprints,
             'currentSprintStats' => $currentSprintStats,
-            'clients' => Client::orderBy('name')->get(),
-            'softwares' => $request->user()->isKielUser() ? \App\Models\Software::where('is_enabled',true)->orderBy('name')->get() : \App\Models\Software::where('is_enabled',true)->where('client_id', $request->user()->client_id)->orderBy('name')->get(),
-            'filters' => $validated,
-            'isKielUser' => $request->user()->isKielUser(),
-        ]);
+            'clients' => $clients,
+            'softwares' => $isKielUser ? \App\Models\Software::where('is_enabled', true)->orderBy('name')->get() : \App\Models\Software::where('is_enabled', true)->where('client_id', $request->user()->client_id)->orderBy('name')->get(),
+            'filters' => array_merge($validated, ['client_id' => $selectedClientId]),
+            'isKielUser' => $isKielUser,
+            'selectedClientId' => $selectedClientId,
+            'canStartSprint' => $canStartSprint,
+        ];
     }
 
     public function startForm(Request $request): View
@@ -74,234 +149,88 @@ class SprintController extends Controller
                     ->where('status', Ticket::STATUS_NEXT_SPRINT)])
                 ->orderBy('name')
                 ->get(),
-            'activeSprints' => Sprint::query()
-                ->where('status', Sprint::STATUS_IN_PROGRESS)
-                ->with('client')
-                ->get()
-                ->keyBy('client_id'),
+            'activeSprints' => Sprint::query()->where('status', Sprint::STATUS_IN_PROGRESS)->with('client')->get()->keyBy('client_id'),
         ]);
     }
 
     public function show(Request $request, Sprint $sprint): View
     {
         $this->authorizeSprintAccess($request, $sprint);
-
-        $sprint->load([
-            'client',
-            'software',
-            'starter',
-            'ender',
-            'activities.user',
-            'tickets' => fn ($query) => $query->with(['client', 'software', 'assignee'])->orderByPivot('position'),
-        ]);
-
+        $sprint->load(['client', 'software', 'starter', 'ender', 'activities.user', 'tickets' => fn ($query) => $query->with(['client', 'software', 'assignee'])->orderByPivot('position')]);
         $completedTickets = $sprint->tickets->filter(fn (Ticket $ticket) => $ticket->isDone())->values();
         $incompleteTickets = $sprint->tickets->reject(fn (Ticket $ticket) => $ticket->isDone())->values();
-        $ticketActivities = TicketActivity::query()
-            ->with(['ticket', 'user'])
-            ->whereIn('ticket_id', $sprint->tickets->pluck('id'))
-            ->latest()
-            ->limit(100)
-            ->get();
+        $ticketActivities = TicketActivity::query()->with(['ticket', 'user'])->whereIn('ticket_id', $sprint->tickets->pluck('id'))->latest()->limit(100)->get();
 
-        return view('sprints.show', [
-            'sprint' => $sprint,
-            'completedTickets' => $completedTickets,
-            'incompleteTickets' => $incompleteTickets,
-            'ticketActivities' => $ticketActivities,
-            'isKielUser' => $request->user()->isKielUser(),
-        ]);
+        return view('sprints.show', compact('sprint', 'completedTickets', 'incompleteTickets', 'ticketActivities') + ['isKielUser' => $request->user()->isKielUser()]);
     }
 
-    public function start(Request $request): RedirectResponse
+    public function start(Request $request): JsonResponse|RedirectResponse
     {
         abort_unless($request->user()->isKielUser(), Response::HTTP_FORBIDDEN);
         abort_unless($request->user()->can('view sprints'), Response::HTTP_FORBIDDEN);
-
-        $validated = $request->validate([
-            'client_id' => ['required', Rule::exists('clients', 'id')],
-        ]);
+        $validated = $request->validate(['client_id' => ['required', Rule::exists('clients', 'id')]]);
 
         $sprint = DB::transaction(function () use ($request, $validated) {
             $client = Client::query()->lockForUpdate()->findOrFail($validated['client_id']);
-
-            $activeSprintExists = Sprint::query()
-                ->where('client_id', $client->id)
-                ->where('status', Sprint::STATUS_IN_PROGRESS)
-                ->lockForUpdate()
-                ->exists();
-
-            if ($activeSprintExists) {
-                throw ValidationException::withMessages([
-                    'client_id' => 'This client already has a sprint in progress. Complete it before starting the next sprint cycle.',
-                ]);
+            if (Sprint::query()->where('client_id', $client->id)->where('status', Sprint::STATUS_IN_PROGRESS)->lockForUpdate()->exists()) {
+                throw ValidationException::withMessages(['client_id' => 'This client already has a sprint in progress.']);
             }
 
-            $featureTickets = Ticket::query()
-                ->where('client_id', $client->id)
-                ->where('type', Ticket::TYPE_FEATURE)
-                ->where('status', Ticket::STATUS_NEXT_SPRINT)
-                ->orderByRaw('priority_order is null')
-                ->orderBy('priority_order')
-                ->orderBy('created_at')
-                ->lockForUpdate()
-                ->get();
-
-            $bugTickets = Ticket::query()
-                ->where('client_id', $client->id)
-                ->where('type', Ticket::TYPE_BUG)
-                ->whereIn('status', [Ticket::STATUS_BUG_PENDING, Ticket::STATUS_BUG_BLOCKED])
-                ->orderByRaw('priority_order is null')
-                ->orderBy('priority_order')
-                ->orderBy('created_at')
-                ->lockForUpdate()
-                ->get();
+            $featureTickets = Ticket::query()->where('client_id', $client->id)->where('type', Ticket::TYPE_FEATURE)->where('status', Ticket::STATUS_NEXT_SPRINT)->orderByRaw('priority_order is null')->orderBy('priority_order')->orderBy('created_at')->lockForUpdate()->get();
+            $bugTickets = Ticket::query()->where('client_id', $client->id)->where('type', Ticket::TYPE_BUG)->whereIn('status', [Ticket::STATUS_BUG_PENDING, Ticket::STATUS_BUG_BLOCKED])->orderByRaw('priority_order is null')->orderBy('priority_order')->orderBy('created_at')->lockForUpdate()->get();
 
             if ($featureTickets->isEmpty() && $bugTickets->isEmpty()) {
-                throw ValidationException::withMessages([
-                    'client_id' => 'No sprint-ready feature or bug tickets are ready for this client.',
-                ]);
+                throw ValidationException::withMessages(['client_id' => 'No sprint-ready feature or bug tickets are ready for this client.']);
             }
 
             $sprintNo = ((int) Sprint::query()->where('client_id', $client->id)->max('sprint_no')) + 1;
             $startedAt = now();
             $softwareIds = $featureTickets->pluck('software_id')->merge($bugTickets->pluck('software_id'))->filter()->unique()->values();
-
-            $sprint = Sprint::create([
-                'client_id' => $client->id,
-                'software_id' => $softwareIds->count() === 1 ? $softwareIds->first() : null,
-                'sprint_no' => $sprintNo,
-                'name' => 'Sprint Cycle '.$sprintNo.' - '.$startedAt->format('M j, Y'),
-                'status' => Sprint::STATUS_IN_PROGRESS,
-                'started_at' => $startedAt,
-                'started_by' => $request->user()->id,
-                'timer_status' => Sprint::TIMER_RUNNING,
-                'paused_at' => null,
-                'accumulated_paused_seconds' => 0,
-            ]);
-
-            $sprint->activities()->create([
-                'user_id' => $request->user()->id,
-                'action' => 'started',
-                'description' => 'Sprint started with '.$featureTickets->count().' generated implementation tasks and '.$bugTickets->count().' bugs.',
-            ]);
+            $sprint = Sprint::create(['client_id' => $client->id,'software_id' => $softwareIds->count() === 1 ? $softwareIds->first() : null,'sprint_no' => $sprintNo,'name' => 'Sprint Cycle '.$sprintNo.' - '.$startedAt->format('M j, Y'),'status' => Sprint::STATUS_IN_PROGRESS,'started_at' => $startedAt,'started_by' => $request->user()->id,'timer_status' => Sprint::TIMER_RUNNING,'paused_at' => null,'accumulated_paused_seconds' => 0]);
+            $sprint->activities()->create(['user_id' => $request->user()->id,'action' => 'started','description' => 'Sprint started with '.$featureTickets->count().' generated implementation tasks and '.$bugTickets->count().' bugs.']);
 
             $position = 1;
-            foreach ($featureTickets->values() as $ticket) {
-                if (Ticket::query()->where('source_feature_id', $ticket->id)->where('generated_from_sprint_id', $sprint->id)->exists()) {
-                    continue;
-                }
-                $generatedTask = Ticket::create([
-                    'client_id' => $ticket->client_id,
-                    'software_id' => $ticket->software_id,
-                    'submitted_by' => $request->user()->id,
-                    'assigned_to' => $ticket->assigned_to,
-                    'ticket_no' => app(\App\Services\TicketNumberService::class)->next(),
-                    'title' => $ticket->title,
-                    'description' => $ticket->description,
-                    'urgency' => $ticket->urgency,
-                    'type' => Ticket::TYPE_TASK,
-                    'status' => Ticket::STATUS_BACKLOG,
-                    'submitted_at' => now(),
-                    'start_date' => $ticket->start_date,
-                    'due_date' => $ticket->due_date,
-                    'estimated_hours' => $ticket->estimated_hours,
-                    'source_feature_id' => $ticket->id,
-                    'generated_from_sprint_id' => $sprint->id,
-                    'is_generated_task' => true,
-                ]);
-
-                $sprint->items()->create([
-                    'ticket_id' => $generatedTask->id,
-                    'position' => $position++,
-                ]);
-
+            foreach ($featureTickets as $ticket) {
+                $generatedTask = Ticket::create(['client_id' => $ticket->client_id,'software_id' => $ticket->software_id,'submitted_by' => $request->user()->id,'assigned_to' => $ticket->assigned_to,'ticket_no' => app(\App\Services\TicketNumberService::class)->next(),'title' => $ticket->title,'description' => $ticket->description,'urgency' => $ticket->urgency,'type' => Ticket::TYPE_TASK,'status' => Ticket::STATUS_BACKLOG,'submitted_at' => now(),'start_date' => $ticket->start_date,'due_date' => $ticket->due_date,'estimated_hours' => $ticket->estimated_hours,'source_feature_id' => $ticket->id,'generated_from_sprint_id' => $sprint->id,'is_generated_task' => true]);
+                $sprint->items()->create(['ticket_id' => $generatedTask->id, 'position' => $position++]);
                 $this->ticketActivityService->log($generatedTask, 'created from feature for sprint', 'Implementation task generated for '.$sprint->name.'.', $request->user());
-                $this->ticketActivityService->log($ticket, 'converted to task for sprint', 'Feature converted to implementation task '.$generatedTask->ticket_no.' for '.$sprint->name.'.', $request->user());
             }
-
-            foreach ($bugTickets->values() as $bugTicket) {
-                $sprint->items()->create([
-                    'ticket_id' => $bugTicket->id,
-                    'position' => $position++,
-                ]);
+            foreach ($bugTickets as $bugTicket) {
+                $sprint->items()->create(['ticket_id' => $bugTicket->id, 'position' => $position++]);
             }
 
             return $sprint;
         });
 
-        return redirect()->route('sprints.show', $sprint)->with('status', 'Sprint started: approved features were converted to tasks and selected bugs were attached.');
+        if ($request->expectsJson()) {
+            return response()->json(['message' => 'Sprint started successfully.','sprint' => ['id' => $sprint->id,'name' => $sprint->name,'status' => $sprint->status,'timer_status' => $sprint->timer_status,'elapsed_seconds' => $sprint->elapsedSeconds(),'show_url' => route('sprints.show', $sprint)]]);
+        }
+
+        return redirect()->route('sprints.show', $sprint)->with('status', 'Sprint started.');
     }
 
-    public function complete(Request $request, Sprint $sprint): RedirectResponse
+    public function complete(Request $request, Sprint $sprint): RedirectResponse|JsonResponse
     {
         abort_unless($request->user()->isKielUser(), Response::HTTP_FORBIDDEN);
         $this->authorizeSprintAccess($request, $sprint);
-        abort_unless($sprint->status === Sprint::STATUS_IN_PROGRESS, Response::HTTP_UNPROCESSABLE_ENTITY, 'Only in-progress sprints can be completed.');
+        abort_unless($sprint->status === Sprint::STATUS_IN_PROGRESS, Response::HTTP_UNPROCESSABLE_ENTITY);
 
         DB::transaction(function () use ($request, $sprint) {
             $sprint->load('tickets');
-            $endedAt = now();
-            $startedAt = $sprint->started_at ?? $endedAt;
             $completedCount = $sprint->tickets->filter(fn (Ticket $ticket) => $ticket->isDone())->count();
             $incompleteCount = $sprint->tickets->count() - $completedCount;
-
-            $sprint->update([
-                'status' => Sprint::STATUS_COMPLETED,
-                'ended_at' => $endedAt,
-                'duration_seconds' => $sprint->elapsedSeconds(),
-                'timer_status' => Sprint::TIMER_COMPLETED,
-                'ended_by' => $request->user()->id,
-            ]);
-
-            $sprint->activities()->create([
-                'user_id' => $request->user()->id,
-                'action' => 'completed',
-                'description' => 'Sprint completed with '.$completedCount.' completed and '.$incompleteCount.' incomplete '.str('ticket')->plural($incompleteCount).'.',
-            ]);
+            $sprint->update(['status' => Sprint::STATUS_COMPLETED,'ended_at' => now(),'duration_seconds' => $sprint->elapsedSeconds(),'timer_status' => Sprint::TIMER_COMPLETED,'ended_by' => $request->user()->id]);
+            $sprint->activities()->create(['user_id' => $request->user()->id,'action' => 'completed','description' => 'Sprint completed with '.$completedCount.' completed and '.$incompleteCount.' incomplete items.']);
         });
 
-        if ($request->expectsJson()) {
-            return response()->json(['message' => 'Sprint completed.', 'timer_status' => Sprint::TIMER_COMPLETED]);
-        }
-
-        return redirect()->route('sprints.show', $sprint)->with('status', 'Sprint completed. Incomplete items remain visible for review.');
+        return $request->expectsJson() ? response()->json(['message' => 'Sprint completed.', 'timer_status' => Sprint::TIMER_COMPLETED]) : redirect()->route('sprints.show', $sprint)->with('status', 'Sprint completed.');
     }
-
 
     public function pause(Request $request, Sprint $sprint): JsonResponse
-    {
-        abort_unless($request->user()->isKielUser(), Response::HTTP_FORBIDDEN);
-        $this->authorizeSprintAccess($request, $sprint);
-        abort_unless($sprint->status === Sprint::STATUS_IN_PROGRESS && $sprint->isRunningTimer(), Response::HTTP_UNPROCESSABLE_ENTITY);
-
-        $sprint->update(['timer_status' => Sprint::TIMER_PAUSED, 'paused_at' => now()]);
-        $sprint->activities()->create(['user_id' => $request->user()->id, 'action' => 'paused', 'description' => 'Sprint timer paused.']);
-
-        return response()->json(['message' => 'Sprint paused.', 'elapsed_seconds' => $sprint->elapsedSeconds(), 'timer_status' => $sprint->timer_status]);
-    }
-
+    { abort_unless($request->user()->isKielUser(), Response::HTTP_FORBIDDEN); $this->authorizeSprintAccess($request, $sprint); abort_unless($sprint->status===Sprint::STATUS_IN_PROGRESS && $sprint->isRunningTimer(), Response::HTTP_UNPROCESSABLE_ENTITY); $sprint->update(['timer_status'=>Sprint::TIMER_PAUSED,'paused_at'=>now()]); return response()->json(['message'=>'Sprint paused.','elapsed_seconds'=>$sprint->elapsedSeconds(),'timer_status'=>$sprint->timer_status]); }
     public function resume(Request $request, Sprint $sprint): JsonResponse
-    {
-        abort_unless($request->user()->isKielUser(), Response::HTTP_FORBIDDEN);
-        $this->authorizeSprintAccess($request, $sprint);
-        abort_unless($sprint->status === Sprint::STATUS_IN_PROGRESS && $sprint->isPausedTimer(), Response::HTTP_UNPROCESSABLE_ENTITY);
-
-        $paused = $sprint->paused_at ? $sprint->paused_at->diffInSeconds(now()) : 0;
-        $sprint->update(['timer_status' => Sprint::TIMER_RUNNING, 'paused_at' => null, 'accumulated_paused_seconds' => ((int) $sprint->accumulated_paused_seconds) + $paused]);
-        $sprint->activities()->create(['user_id' => $request->user()->id, 'action' => 'resumed', 'description' => 'Sprint timer resumed.']);
-
-        return response()->json(['message' => 'Sprint resumed.', 'elapsed_seconds' => $sprint->elapsedSeconds(), 'timer_status' => $sprint->timer_status]);
-    }
-
-    public function end(Request $request, Sprint $sprint): JsonResponse|RedirectResponse
-    {
-        return $this->complete($request, $sprint);
-    }
-
+    { abort_unless($request->user()->isKielUser(), Response::HTTP_FORBIDDEN); $this->authorizeSprintAccess($request, $sprint); abort_unless($sprint->status===Sprint::STATUS_IN_PROGRESS && $sprint->isPausedTimer(), Response::HTTP_UNPROCESSABLE_ENTITY); $paused = $sprint->paused_at ? $sprint->paused_at->diffInSeconds(now()) : 0; $sprint->update(['timer_status'=>Sprint::TIMER_RUNNING,'paused_at'=>null,'accumulated_paused_seconds'=>((int)$sprint->accumulated_paused_seconds)+$paused]); return response()->json(['message'=>'Sprint resumed.','elapsed_seconds'=>$sprint->elapsedSeconds(),'timer_status'=>$sprint->timer_status]); }
+    public function end(Request $request, Sprint $sprint): JsonResponse|RedirectResponse { return $this->complete($request, $sprint); }
     private function authorizeSprintAccess(Request $request, Sprint $sprint): void
-    {
-        abort_unless($request->user()->can('view sprints'), Response::HTTP_FORBIDDEN);
-        abort_unless($request->user()->isKielUser() || $sprint->client_id === $request->user()->client_id, Response::HTTP_FORBIDDEN);
-    }
+    { abort_unless($request->user()->can('view sprints'), Response::HTTP_FORBIDDEN); abort_unless($request->user()->isKielUser() || $sprint->client_id===$request->user()->client_id, Response::HTTP_FORBIDDEN); }
 }

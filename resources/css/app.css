@@ -212,3 +212,14 @@ body.is-column-resizing { cursor: col-resize; user-select: none; }
 .timeline-gantt-inner svg {
     min-height: 100% !important;
 }
+
+@layer components {
+  .sprint-panel { @apply border border-slate-200 bg-white rounded-none; }
+  .sprint-table thead { @apply bg-slate-50 text-left text-xs font-black uppercase tracking-widest text-slate-500; }
+  .sprint-table th, .sprint-table td { @apply px-3 py-2 border-b border-slate-100; }
+  .sprint-icon-button { @apply inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-50; }
+  .approval-switch { @apply inline-flex h-6 w-11 rounded-full p-0.5 transition disabled:opacity-50; }
+  .approval-switch span { @apply h-5 w-5 rounded-full bg-white shadow transition; }
+  .approval-switch-on { @apply bg-emerald-500 justify-end; }
+  .approval-switch-off { @apply bg-slate-400 justify-start; }
+}
