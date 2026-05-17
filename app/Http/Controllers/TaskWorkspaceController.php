@@ -42,9 +42,12 @@ class TaskWorkspaceController extends Controller
 
         $sort = $validated['sort'] ?? 'updated_at';
         $direction = $validated['direction'] ?? 'desc';
-        $activeView = in_array($validated['view'] ?? 'list', ['list', 'board', 'timeline'], true)
-            ? $validated['view']
+        $requestedView = $validated['view'] ?? 'list';
+        $activeView = in_array($requestedView, ['list', 'board', 'timeline'], true)
+            ? $requestedView
             : 'list';
+
+        $filters = array_merge(['view' => $activeView], $validated);
 
         $ticketsQuery = Ticket::query()
             ->visibleTo($request->user())
@@ -75,7 +78,7 @@ class TaskWorkspaceController extends Controller
             'teamMembers' => User::query()->where('role', User::ROLE_KIEL_TEAM)->orderBy('name')->get(['id', 'name']),
             'clients' => Client::query()->when(! $request->user()->isKielUser(), fn ($q) => $q->whereKey($request->user()->client_id))->orderBy('name')->get(['id', 'name']),
             'softwares' => Software::query()->when(! $request->user()->isKielUser(), fn ($q) => $q->where('client_id', $request->user()->client_id))->orderBy('name')->get(['id', 'name']),
-            'filters' => $validated,
+            'filters' => $filters,
             'sort' => $sort,
             'direction' => $direction,
             'canEditTimeline' => $this->timelineService->canEdit($request->user()),
