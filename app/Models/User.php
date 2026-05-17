@@ -86,6 +86,11 @@ class User extends Authenticatable
         return $this->hasMany(Ticket::class, 'assigned_to');
     }
 
+    public function timeLogs(): HasMany
+    {
+        return $this->hasMany(TimeLog::class);
+    }
+
     public function ticketComments(): HasMany
     {
         return $this->hasMany(TicketComment::class);

@@ -39,6 +39,11 @@ class Client extends Model
         return $this->hasMany(Ticket::class);
     }
 
+    public function timeLogs(): HasMany
+    {
+        return $this->hasMany(TimeLog::class);
+    }
+
     public function sprints(): HasMany
     {
         return $this->hasMany(Sprint::class);
