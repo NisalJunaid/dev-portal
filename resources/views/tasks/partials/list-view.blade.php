@@ -26,68 +26,6 @@
         statusOptions: @js($statusOptions),
     })"
 >
-    <div x-show="showFilters" class="border-b border-slate-200 bg-white p-5">
-        <form method="GET" action="{{ route('tasks.index') }}" class="grid gap-3 xl:grid-cols-[minmax(18rem,1fr)_repeat(7,minmax(0,11rem))_auto]">
-            <label class="xl:col-span-2">
-                <span class="sr-only">Search tickets</span>
-                <input name="search" value="{{ $filters['search'] ?? '' }}" type="search" placeholder="Search ticket number, title, client, software, assignee..." class="w-full rounded-2xl border-slate-200 text-sm font-semibold shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-            </label>
-            <select name="type" class="rounded-2xl border-slate-200 text-sm font-bold text-slate-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                <option value="">All types</option>
-                @foreach (\App\Models\Ticket::TYPES as $type)
-                    <option value="{{ $type }}" @selected(($filters['type'] ?? '') === $type)>{{ str($type)->headline() }}</option>
-                @endforeach
-            </select>
-            <select name="urgency" class="rounded-2xl border-slate-200 text-sm font-bold text-slate-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                <option value="">All urgency</option>
-                @foreach (\App\Models\Ticket::URGENCIES as $urgency)
-                    <option value="{{ $urgency }}" @selected(($filters['urgency'] ?? '') === $urgency)>{{ str($urgency)->headline() }}</option>
-                @endforeach
-            </select>
-            <select name="status" class="rounded-2xl border-slate-200 text-sm font-bold text-slate-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                <option value="">All statuses</option>
-                @foreach (\App\Models\Ticket::STATUSES as $statusOption)
-                    <option value="{{ $statusOption }}" @selected(($filters['status'] ?? '') === $statusOption)>{{ str($statusOption)->replace('_', ' ')->headline() }}</option>
-                @endforeach
-            </select>
-            <select name="assigned_to" class="rounded-2xl border-slate-200 text-sm font-bold text-slate-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                <option value="">Any assignee</option>
-                <option value="unassigned" @selected(($filters['assigned_to'] ?? '') === 'unassigned')>Unassigned</option>
-                @foreach ($teamMembers as $member)
-                    <option value="{{ $member->id }}" @selected((string) ($filters['assigned_to'] ?? '') === (string) $member->id)>{{ $member->name }}</option>
-                @endforeach
-            </select>
-            @if ($isKielUser)
-                <select name="client_id" class="rounded-2xl border-slate-200 text-sm font-bold text-slate-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                    <option value="">All clients</option>
-                    @foreach ($clients as $client)
-                        <option value="{{ $client->id }}" @selected((string) ($filters['client_id'] ?? '') === (string) $client->id)>{{ $client->name }}</option>
-                    @endforeach
-                </select>
-            @endif
-            <select name="software_id" class="rounded-2xl border-slate-200 text-sm font-bold text-slate-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                <option value="">All software</option>
-                @foreach ($softwares as $software)
-                    <option value="{{ $software->id }}" @selected((string) ($filters['software_id'] ?? '') === (string) $software->id)>{{ $software->name }}</option>
-                @endforeach
-            </select>
-            <select name="blocked" class="rounded-2xl border-slate-200 text-sm font-bold text-slate-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                <option value="">Any block</option>
-                <option value="yes" @selected(($filters['blocked'] ?? '') === 'yes')>Blocked</option>
-                <option value="no" @selected(($filters['blocked'] ?? '') === 'no')>Not blocked</option>
-            </select>
-            <select name="per_page" class="rounded-2xl border-slate-200 text-sm font-bold text-slate-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                @foreach ([10, 25, 50, 100] as $size)
-                    <option value="{{ $size }}" @selected((int) ($filters['per_page'] ?? 25) === $size)>{{ $size }}/page</option>
-                @endforeach
-            </select>
-            <div class="flex gap-2">
-                <button type="submit" class="rounded-2xl bg-indigo-600 px-5 py-2.5 text-sm font-black text-white shadow-soft transition hover:bg-indigo-700">Apply</button>
-                <a href="{{ route('tasks.index') }}" class="rounded-2xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-black text-slate-600 shadow-sm transition hover:border-indigo-200 hover:text-indigo-700">Reset</a>
-            </div>
-        </form>
-    </div>
-
     @if ($tickets->count())
         <div class="overflow-x-auto">
             <table class="min-w-[1500px] divide-y divide-slate-200 text-sm">

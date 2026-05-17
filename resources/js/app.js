@@ -194,3 +194,55 @@ Alpine.data('confirmModal', () => ({
 }));
 
 Alpine.start();
+
+const loadSortable = () => {
+    if (window.Sortable) return Promise.resolve(window.Sortable);
+    if (window.__kielSortablePromise) return window.__kielSortablePromise;
+    window.__kielSortablePromise = new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js';
+        script.onload = () => resolve(window.Sortable);
+        script.onerror = reject;
+        document.head.appendChild(script);
+    });
+    return window.__kielSortablePromise;
+};
+
+const updateKanbanEmptyStates = (board) => board.querySelectorAll('[data-kanban-column]').forEach((c) => {
+    const empty = c.querySelector('[data-empty-state]');
+    const hasCards = c.querySelector('[data-kanban-card]');
+    if (empty) empty.classList.toggle('hidden', !!hasCards);
+    const count = c.closest('div.w-full')?.querySelector('[data-column-count]');
+    if (count) count.textContent = c.querySelectorAll('[data-kanban-card]').length;
+});
+
+window.KielKanban = {
+    async initAll() {
+        await loadSortable().catch(() => window.Kiel.toast('Kanban library failed to load.', 'error'));
+        document.querySelectorAll('[data-kanban-board]').forEach((board) => {
+            if (board.dataset.kanbanInitialized === '1' || board.dataset.canMove !== 'true' || !window.Sortable) return;
+            board.dataset.kanbanInitialized = '1';
+            board.querySelectorAll('[data-kanban-column]').forEach((column) => {
+                window.Sortable.create(column, {
+                    group: 'kiel-kanban', animation: 150, draggable: '[data-kanban-card]', ghostClass: 'opacity-60', chosenClass: 'ring-2 ring-indigo-300',
+                    onEnd: async (evt) => {
+                        const card = evt.item; const boardView = board.dataset.view || 'all';
+                        const ticketId = card.dataset.ticketId; const status = evt.to.dataset.column;
+                        const ordered = Array.from(evt.to.querySelectorAll('[data-kanban-card]')).map((el) => Number(el.dataset.ticketId));
+                        try {
+                            await window.Kiel.request(card.dataset.moveUrl, { method: 'PATCH', body: JSON.stringify({ status, position: evt.newIndex, view: boardView }) });
+                            await window.Kiel.request(board.dataset.reorderUrl, { method: 'PATCH', body: JSON.stringify({ status, ticket_ids: ordered, view: boardView }) });
+                            updateKanbanEmptyStates(board); window.Kiel.toast(`Ticket #${ticketId} moved.`, 'success');
+                        } catch (error) {
+                            window.Kiel.toast(error.message || 'Unable to move ticket.', 'error');
+                            window.location.reload();
+                        }
+                    },
+                });
+            });
+            updateKanbanEmptyStates(board);
+        });
+    },
+};
+
+window.KielTimeline = { initAll() { document.querySelectorAll('[data-timeline-view]').forEach(() => {}); } };

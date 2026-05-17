@@ -158,3 +158,34 @@ Production hardening and deployment preparation.
 
 ### Next planned task
 Production hardening and deployment preparation.
+
+## Completed: Tasks workspace UX hardening + interaction fixes
+
+### Summary
+- Reworked `/tasks` into a minimal unified toolbar-first layout with icon-only view switcher.
+- Switched List/Board/Timeline to in-page Alpine view switching (`x-show`) with URL `pushState` updates (no full navigation).
+- Moved filters into one shared global filter panel controlled by one button across all views.
+- Removed timeline header/status/filter cards and kept only compact schedule area.
+- Fixed Kanban markup and implemented end-to-end Sortable drag/drop initialization with move+reorder PATCH calls.
+- Standardized update feedback to floating toasts via `window.Kiel.toast(...)`.
+
+### Files changed
+- `resources/views/tasks/index.blade.php`
+- `resources/views/tasks/partials/list-view.blade.php`
+- `resources/views/tasks/partials/kanban-view.blade.php`
+- `resources/views/tasks/partials/timeline-view.blade.php`
+- `resources/js/app.js`
+- `resources/views/layouts/app.blade.php`
+- `docs/IMPLEMENTATION_TRACKER.md`
+
+### Tests/checks run
+- `php artisan view:clear`
+- `php artisan optimize:clear`
+- `php artisan route:list`
+- `php artisan test`
+
+### Known remaining issues
+- If Composer `vendor/` dependencies are unavailable in a local container, artisan/test commands fail before app boot.
+
+### Next planned task
+Production hardening and deployment preparation.
