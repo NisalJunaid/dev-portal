@@ -3,19 +3,19 @@
     data-view="{{ $activeView }}"
     data-can-move="{{ $canMove ? 'true' : 'false' }}"
     data-reorder-url="{{ route('kanban.tickets.reorder') }}"
-    class="space-y-4"
+    class="h-full min-h-0"
 >
-    <div class="grid auto-cols-[minmax(18rem,20rem)] grid-flow-col gap-4 overflow-x-auto pb-4 sm:auto-cols-[20rem] lg:gap-5">
+    <div class="grid h-full min-h-0 auto-cols-[minmax(18rem,20rem)] grid-flow-col gap-4 overflow-x-auto pb-4 sm:auto-cols-[20rem] lg:gap-5 sleek-scrollbar">
         @foreach ($columns as $columnKey => $label)
             @php($columnTickets = $ticketsByColumn[$columnKey] ?? collect())
-            <div class="w-full rounded-3xl border border-slate-200 bg-slate-100/80 p-4">
+            <div class="flex h-full min-h-0 w-full flex-col border border-slate-200 bg-slate-100/80 p-4">
                 <div class="mb-4 flex items-start justify-between gap-3">
                     <div>
                         <h3 class="text-sm font-black uppercase tracking-[0.2em] text-slate-700">{{ $label }}</h3>
                         <p class="mt-1 text-xs font-bold text-slate-400"><span data-column-count>{{ $columnTickets->count() }}</span> tickets</p>
                     </div>
                 </div>
-                <div data-kanban-column data-column="{{ $columnKey }}" class="min-h-[28rem] space-y-3 rounded-2xl border border-dashed border-slate-300 bg-white/60 p-3 sm:min-h-[34rem]">
+                <div data-kanban-column data-column="{{ $columnKey }}" class="min-h-0 flex-1 space-y-3 overflow-y-auto rounded-2xl border border-dashed border-slate-300 bg-white/60 p-3 sleek-scrollbar">
                     @forelse ($columnTickets as $ticket)
                         @include('kanban.partials.card', ['ticket' => $ticket, 'activeView' => $activeView])
                     @empty

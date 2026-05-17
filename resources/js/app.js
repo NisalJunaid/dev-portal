@@ -89,7 +89,24 @@ const setLoading = (element, loading = true, label = 'Saving…') => {
     }
 };
 
-window.Kiel = { csrfToken, request, toast, confirm, setLoading, errorMessage };
+
+const taskColumnDefinitions = [
+    { key: 'ticket_no', label: 'Ticket #', min: 120, defaultWidth: 140, max: 600 },
+    { key: 'title', label: 'Title', min: 260, defaultWidth: 320, max: 900 },
+    { key: 'type', label: 'Type', min: 120, defaultWidth: 130, max: 600 },
+    { key: 'urgency', label: 'Urgency', min: 140, defaultWidth: 150, max: 600 },
+    { key: 'status', label: 'Status', min: 160, defaultWidth: 180, max: 600 },
+    { key: 'assigned_to', label: 'Assigned to', min: 180, defaultWidth: 200, max: 600 },
+    { key: 'client', label: 'Client', min: 180, defaultWidth: 180, max: 600 },
+    { key: 'software', label: 'Software', min: 180, defaultWidth: 180, max: 600 },
+    { key: 'start_date', label: 'Start date', min: 150, defaultWidth: 160, max: 600 },
+    { key: 'due_date', label: 'Due date', min: 150, defaultWidth: 160, max: 600 },
+    { key: 'sprint', label: 'Sprint cycle', min: 200, defaultWidth: 220, max: 700 },
+    { key: 'blocked', label: 'Blocked', min: 120, defaultWidth: 130, max: 400 },
+    { key: 'updated_at', label: 'Last updated', min: 180, defaultWidth: 200, max: 700 },
+];
+window.Kiel = { csrfToken, request, toast, confirm, setLoading, errorMessage, taskColumnsConfig: taskColumnDefinitions };
+
 
 
 const bindAjaxActions = () => {
@@ -192,6 +209,18 @@ Alpine.data('confirmModal', () => ({
             : 'bg-indigo-600 text-white hover:bg-indigo-700';
     },
 }));
+
+
+Alpine.store('taskColumns', {
+    columns: taskColumnDefinitions,
+    visible: {}, widths: {}, initialized: false,
+    init() { if (this.initialized) return; this.initialized = true; const v = JSON.parse(localStorage.getItem('kiel.tasks.list.columns.visible') || '{}'); const w = JSON.parse(localStorage.getItem('kiel.tasks.list.columns.widths') || '{}'); this.columns.forEach((c) => { this.visible[c.key] = v[c.key] !== false; this.widths[c.key] = Math.max(c.min, Math.min(Number(w[c.key] || c.defaultWidth), c.max || 600)); }); },
+    isVisible(key){ return this.visible[key] !== false; },
+    toggle(key){ this.visible[key]=!this.isVisible(key); localStorage.setItem('kiel.tasks.list.columns.visible', JSON.stringify(this.visible)); },
+    reset(){ this.columns.forEach((c)=>{ this.visible[c.key]=true; this.widths[c.key]=c.defaultWidth;}); localStorage.setItem('kiel.tasks.list.columns.visible', JSON.stringify(this.visible)); localStorage.setItem('kiel.tasks.list.columns.widths', JSON.stringify(this.widths)); },
+    width(key){ return this.widths[key] || 180; }, hiddenCount(){ return this.columns.filter((c)=>!this.isVisible(c.key)).length; },
+    startResize(event,key){ const c=this.columns.find((x)=>x.key===key); if(!c) return; const startX=event.clientX,startW=this.width(key); document.body.classList.add('is-column-resizing'); const move=(e)=>{ const next=Math.max(c.min, Math.min(startW+(e.clientX-startX), c.max||600)); this.widths[key]=Math.round(next); }; const up=()=>{ document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up); document.body.classList.remove('is-column-resizing'); localStorage.setItem('kiel.tasks.list.columns.widths', JSON.stringify(this.widths)); }; document.addEventListener('mousemove', move); document.addEventListener('mouseup', up); },
+});
 
 Alpine.start();
 

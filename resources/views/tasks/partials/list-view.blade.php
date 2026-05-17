@@ -18,7 +18,7 @@
 @endphp
 
 <section
-    class="card overflow-hidden p-0"
+    class="asana-panel h-full min-h-0 overflow-hidden p-0"
     x-data="ticketList({
         canInlineEdit: @js($isKielUser),
         urgencyOptions: @js($urgencyOptions),
@@ -27,8 +27,14 @@
     })"
 >
     @if ($tickets->count())
-        <div class="overflow-x-auto">
-            <table class="min-w-[1500px] divide-y divide-slate-200 text-sm">
+        <div class="flex h-full min-h-0 flex-col">
+        <div class="tasks-scroll-area scrollbar-fade-mask flex-1 min-h-0 overflow-auto sleek-scrollbar">
+            <table class="min-w-[1800px] table-fixed divide-y divide-slate-200 text-sm">
+                <colgroup>
+                    <template x-for="column in columns" :key="'col-'+column.key">
+                        <col :data-column-key="column.key" x-show="isColumnVisible(column.key)" :style="`width:${columnWidth(column.key)}px`">
+                    </template>
+                </colgroup>
                 <thead class="bg-slate-50 text-left text-xs font-black uppercase tracking-widest text-slate-500">
                     <tr>
                         @foreach ([
@@ -46,10 +52,10 @@
                             'blocked' => 'Blocked',
                             'updated_at' => 'Last updated',
                         ] as $column => $label)
-                            <th class="px-4 py-4 whitespace-nowrap">
+                            <th class="group relative px-4 py-4 whitespace-nowrap" x-show="isColumnVisible('{{ $column }}')" data-column-key="{{ $column }}">
                                 <a href="{{ $sortUrl($column) }}" class="inline-flex items-center gap-1 transition hover:text-indigo-700">
                                     {{ $label }} <span aria-hidden="true">{{ $sortIndicator($column) }}</span>
-                                </a>
+                                </a><button type="button" class="column-resize-handle" @mousedown.prevent="startResize($event, '{{ $column }}')"></button>
                             </th>
                         @endforeach
                     </tr>
@@ -84,10 +90,10 @@
                                 meta: @js(['due_date_overdue' => $isOverdue, 'blocked' => $ticket->isBlocked()]),
                             })"
                         >
-                            <td class="whitespace-nowrap px-4 py-4 align-top">
+                            <td x-show="isColumnVisible('ticket_no')" data-column-key="ticket_no" class="whitespace-nowrap px-4 py-4 align-top">
                                 <a href="{{ route('tickets.show', $ticket) }}" data-ticket-drawer-url="{{ route('tickets.drawer', $ticket) }}" class="font-black text-slate-950 transition hover:text-indigo-700">{{ $ticket->ticket_no }}</a>
                             </td>
-                            <td class="min-w-72 px-4 py-3 align-top">
+                            <td x-show="isColumnVisible('title')" data-column-key="title" class="min-w-72 px-4 py-3 align-top">
                                 @if ($isKielUser)
                                     <div class="relative" :class="stateClass('title')">
                                         <input type="text" x-model="values.title" @blur="save('title')" @keydown.enter.prevent="$event.target.blur()" class="w-full rounded-xl border border-transparent bg-transparent px-2 py-1 font-bold text-slate-800 transition focus:border-indigo-200 focus:bg-white focus:ring-indigo-500">
@@ -98,8 +104,8 @@
                                     <a href="{{ route('tickets.show', $ticket) }}" data-ticket-drawer-url="{{ route('tickets.drawer', $ticket) }}" class="font-bold text-slate-800 hover:text-indigo-700">{{ $ticket->title }}</a>
                                 @endif
                             </td>
-                            <td class="whitespace-nowrap px-4 py-4 align-top font-bold text-slate-600">{{ str($ticket->type ?? 'unclassified')->headline() }}</td>
-                            <td class="whitespace-nowrap px-4 py-3 align-top">
+                            <td x-show="isColumnVisible('type')" data-column-key="type" class="whitespace-nowrap px-4 py-4 align-top font-bold text-slate-600">{{ str($ticket->type ?? 'unclassified')->headline() }}</td>
+                            <td x-show="isColumnVisible('urgency')" data-column-key="urgency" class="whitespace-nowrap px-4 py-3 align-top">
                                 @if ($isKielUser)
                                     <select x-model="values.urgency" @change="save('urgency')" :class="badgeClass('urgency')" class="rounded-full border-0 px-3 py-1 text-xs font-black uppercase tracking-wide ring-1 ring-inset focus:ring-2 focus:ring-indigo-500">
                                         <template x-for="option in window.ticketListConfig.urgencyOptions" :key="option.value"><option :value="option.value" x-text="option.label"></option></template>
@@ -109,7 +115,7 @@
                                     <span @class(['badge', 'badge-urgency-critical' => $ticket->urgency === 'critical', 'badge-urgency-high' => $ticket->urgency === 'high', 'badge-urgency-medium' => $ticket->urgency === 'medium', 'badge-urgency-low' => $ticket->urgency === 'low'])>{{ $ticket->formattedUrgency() }}</span>
                                 @endif
                             </td>
-                            <td class="whitespace-nowrap px-4 py-3 align-top">
+                            <td x-show="isColumnVisible('status')" data-column-key="status" class="whitespace-nowrap px-4 py-3 align-top">
                                 @if ($isKielUser)
                                     <select x-model="values.status" @change="save('status')" :class="badgeClass('status')" class="max-w-48 rounded-full border-0 px-3 py-1 text-xs font-black uppercase tracking-wide ring-1 ring-inset focus:ring-2 focus:ring-indigo-500">
                                         @foreach ($rowStatusOptions as $option)
@@ -121,7 +127,7 @@
                                     <span @class(['badge', 'badge-blocked' => $ticket->isBlocked(), 'bg-emerald-100 text-emerald-700 ring-emerald-200' => in_array($ticket->status, [\App\Models\Ticket::STATUS_BUG_COMPLETED, \App\Models\Ticket::STATUS_FEATURE_COMPLETED], true), 'bg-indigo-100 text-indigo-700 ring-indigo-200' => $ticket->status === \App\Models\Ticket::STATUS_IN_PROGRESS, 'badge-status' => ! $ticket->isBlocked()])>{{ $ticket->formattedStatus() }}</span>
                                 @endif
                             </td>
-                            <td class="whitespace-nowrap px-4 py-3 align-top">
+                            <td x-show="isColumnVisible('assigned_to')" data-column-key="assigned_to" class="whitespace-nowrap px-4 py-3 align-top">
                                 @if ($isKielUser)
                                     <select x-model="values.assigned_to" @change="save('assigned_to')" class="rounded-xl border-slate-200 bg-white text-sm font-bold text-slate-700 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" :class="stateClass('assigned_to')">
                                         <option value="">Unassigned</option>
@@ -132,16 +138,16 @@
                                     <span class="font-bold text-slate-600">{{ $ticket->assignee?->name ?? 'Unassigned' }}</span>
                                 @endif
                             </td>
-                            <td class="whitespace-nowrap px-4 py-4 align-top font-bold text-slate-700">{{ $ticket->client->name }}</td>
-                            <td class="whitespace-nowrap px-4 py-4 align-top text-slate-600">{{ $ticket->software->name }}</td>
-                            <td class="whitespace-nowrap px-4 py-3 align-top">
+                            <td x-show="isColumnVisible('client')" data-column-key="client" class="whitespace-nowrap px-4 py-4 align-top font-bold text-slate-700">{{ $ticket->client->name }}</td>
+                            <td x-show="isColumnVisible('software')" data-column-key="software" class="whitespace-nowrap px-4 py-4 align-top text-slate-600">{{ $ticket->software->name }}</td>
+                            <td x-show="isColumnVisible('start_date')" data-column-key="start_date" class="whitespace-nowrap px-4 py-3 align-top">
                                 @if ($isKielUser)
                                     <input type="date" x-model="values.start_date" @change="save('start_date')" class="rounded-xl border-slate-200 bg-white text-sm font-bold text-slate-700 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" :class="stateClass('start_date')">
                                 @else
                                     <span class="text-slate-600">{{ $ticket->start_date?->format('M j, Y') ?? 'Not set' }}</span>
                                 @endif
                             </td>
-                            <td class="whitespace-nowrap px-4 py-3 align-top">
+                            <td x-show="isColumnVisible('due_date')" data-column-key="due_date" class="whitespace-nowrap px-4 py-3 align-top">
                                 @if ($isKielUser)
                                     <input type="date" x-model="values.due_date" @change="save('due_date')" class="rounded-xl border-slate-200 bg-white text-sm font-bold shadow-sm focus:border-indigo-500 focus:ring-indigo-500" :class="[stateClass('due_date'), meta.due_date_overdue ? 'border-rose-300 bg-rose-50 text-rose-700' : 'text-slate-700']">
                                 @else
@@ -149,20 +155,21 @@
                                 @endif
                                 <span x-show="meta.due_date_overdue" class="badge badge-overdue ml-2">Overdue</span>
                             </td>
-                            <td class="whitespace-nowrap px-4 py-4 align-top text-slate-600">{{ $latestSprint ? '#'.$latestSprint->sprint_no.' '.$latestSprint->name : 'No sprint' }}</td>
-                            <td class="whitespace-nowrap px-4 py-4 align-top">
+                            <td x-show="isColumnVisible('sprint')" data-column-key="sprint" class="whitespace-nowrap px-4 py-4 align-top text-slate-600">{{ $latestSprint ? '#'.$latestSprint->sprint_no.' '.$latestSprint->name : 'No sprint' }}</td>
+                            <td x-show="isColumnVisible('blocked')" data-column-key="blocked" class="whitespace-nowrap px-4 py-4 align-top">
                                 <span x-show="meta.blocked" class="badge badge-blocked">Blocked</span>
                                 <span x-show="! meta.blocked" class="badge bg-emerald-50 text-emerald-700 ring-emerald-200">Clear</span>
                             </td>
-                            <td class="whitespace-nowrap px-4 py-4 align-top text-slate-500" x-text="labels.updated_at"></td>
+                            <td x-show="isColumnVisible('updated_at')" data-column-key="updated_at" class="whitespace-nowrap px-4 py-4 align-top text-slate-500" x-text="labels.updated_at"></td>
                         </tr>
                     @endforeach
                 </tbody>
             </table>
         </div>
-        <div class="border-t border-slate-200 px-6 py-4">{{ $tickets->links() }}</div>
+        <div class="shrink-0 border-t border-slate-200 px-6 py-4">{{ $tickets->links() }}</div>
+        </div>
     @else
-        <div class="p-12 text-center">
+        <div class="flex h-full items-center justify-center p-12 text-center">
             <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-indigo-50 text-2xl">🎫</div>
             <h3 class="mt-5 text-xl font-black text-slate-950">No tickets found</h3>
             <p class="mt-2 text-slate-500">Adjust the search or filters to find matching tickets.</p>
@@ -173,7 +180,7 @@
 <script>
     window.ticketList = function (config) {
         window.ticketListConfig = config;
-        return config;
+        return { ...config, columns: (window.Kiel.taskColumnsConfig || []), isColumnVisible(key){ return this.$store.taskColumns.isVisible(key); }, columnWidth(key){ return this.$store.taskColumns.width(key); }, startResize(event,key){ this.$store.taskColumns.startResize(event,key); } };
     };
 
     window.ticketRow = function (config) {
