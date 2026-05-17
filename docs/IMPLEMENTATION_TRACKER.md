@@ -339,3 +339,11 @@ Production hardening and deployment preparation.
 
 ### Next planned task
 Production hardening and deployment preparation.
+
+## Issue: generated task links migration fails on missing column
+
+- migration issue: `database/migrations/2026_05_17_000100_add_generated_task_links_to_tickets_table.php` failed with `SQLSTATE[42000]: Syntax error or access violation: 1072 Key column 'generated_from_sprint_id' doesn't exist in table`.
+- root cause: the migration attempted to add a foreign key constraint for `generated_from_sprint_id` before creating the column.
+- fix applied: updated migration to add `source_feature_id`, `generated_from_sprint_id`, and `is_generated_task` columns first using `foreignId()->nullable()->constrained(...)->nullOnDelete()` (for the two FK columns), wrapped each add/drop in `Schema::hasColumn` guards for partial-failure safety, and implemented safe `down()` cleanup with `dropConstrainedForeignId` and `dropColumn`.
+- migration test result: attempted `php artisan migrate`, but this container failed before Laravel boot because `vendor/autoload.php` is missing; migration SQL path is fixed in code and ready to run once dependencies are installed.
+- next planned task unchanged: Production hardening and deployment preparation.
