@@ -2,6 +2,7 @@
     $menuItems = [
         ['label' => 'Dashboard', 'route' => 'dashboard', 'permission' => null, 'icon' => 'grid'],
         ['label' => 'Tickets', 'route' => 'tickets.index', 'permission' => 'view tickets', 'icon' => 'ticket'],
+        ['label' => 'Kanban', 'route' => 'kanban.index', 'permission' => 'view tickets', 'icon' => 'columns'],
         ['label' => 'Bugs', 'route' => 'bugs.index', 'permission' => 'view bugs', 'icon' => 'bug'],
         ['label' => 'Features', 'route' => 'features.index', 'permission' => 'view features', 'icon' => 'sparkles'],
         ['label' => 'Sprints', 'route' => 'sprints.index', 'permission' => 'view sprints', 'icon' => 'calendar'],
@@ -37,7 +38,7 @@
             <nav class="mt-8 space-y-1">
                 @foreach ($menuItems as $item)
                     @if ($item['permission'] === null || auth()->user()->can($item['permission']))
-                        <a href="{{ route($item['route']) }}" @class(['app-shell-link', 'app-shell-link-active' => request()->routeIs($item['route'])])>
+                        <a href="{{ route($item['route']) }}" @class(['app-shell-link', 'app-shell-link-active' => request()->routeIs($item['route']) || ($item['route'] === 'kanban.index' && request()->routeIs('kanban.*'))])>
                             <span class="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-200/80 text-xs font-black text-slate-500">{{ mb_substr($item['label'], 0, 1) }}</span>
                             <span>{{ $item['label'] }}</span>
                         </a>
