@@ -144,6 +144,14 @@ class TimelineService
             $isOverdue ? 'Overdue' : null,
         ])->filter()->join(' · ');
 
+        $timelineClass = 'timeline-urgency-'.$ticket->urgency;
+
+        if ($ticket->isBlocked() || $ticket->activeBlock) {
+            $timelineClass .= '-blocked';
+        } elseif ($isOverdue) {
+            $timelineClass .= '-overdue';
+        }
+
         return [
             'id' => (string) $ticket->id,
             'name' => trim($ticket->ticket_no.' · '.$ticket->title.' — '.$metadata),
@@ -151,12 +159,7 @@ class TimelineService
             'end' => $ticket->due_date?->toDateString(),
             'progress' => in_array($ticket->status, [Ticket::STATUS_BUG_COMPLETED, Ticket::STATUS_FEATURE_COMPLETED], true) ? 100 : 0,
             'dependencies' => $ticket->depends_on_ticket_id ? (string) $ticket->depends_on_ticket_id : '',
-            'custom_class' => collect([
-                'timeline-task',
-                'timeline-urgency-'.$ticket->urgency,
-                $ticket->isBlocked() || $ticket->activeBlock ? 'timeline-blocked' : null,
-                $isOverdue ? 'timeline-overdue' : null,
-            ])->filter()->join(' '),
+            'custom_class' => $timelineClass,
             'ticket' => [
                 'id' => $ticket->id,
                 'ticket_no' => $ticket->ticket_no,

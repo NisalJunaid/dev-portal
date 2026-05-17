@@ -43,8 +43,10 @@ class TimelineWorkflowTest extends TestCase
         $visible = $this->ticket($client, $software, $clientUser, Ticket::TYPE_FEATURE, Ticket::STATUS_FEATURE_BLOCKED, now()->subDays(5)->toDateString(), now()->subDay()->toDateString(), 'critical');
         $this->ticket($client, $software, $clientUser, Ticket::TYPE_BUG, Ticket::STATUS_BUG_PENDING, now()->toDateString(), now()->addDays(2)->toDateString(), 'low');
 
-        $this->actingAs($developer)
-            ->getJson(route('timeline.data', ['client_id' => $client->id, 'software_id' => $software->id, 'urgency' => 'critical', 'status' => Ticket::STATUS_FEATURE_BLOCKED]))
+        $response = $this->actingAs($developer)
+            ->getJson(route('timeline.data', ['client_id' => $client->id, 'software_id' => $software->id, 'urgency' => 'critical', 'status' => Ticket::STATUS_FEATURE_BLOCKED]));
+
+        $response
             ->assertOk()
             ->assertJsonPath('library', 'frappe-gantt')
             ->assertJsonPath('can_edit', true)
@@ -55,6 +57,12 @@ class TimelineWorkflowTest extends TestCase
             ->assertJsonPath('tasks.0.ticket.urgency_label', 'Critical')
             ->assertJsonPath('tasks.0.ticket.blocked', true)
             ->assertJsonPath('tasks.0.ticket.overdue', true);
+
+        foreach ($response->json('tasks') as $task) {
+            $this->assertArrayHasKey('custom_class', $task);
+            $this->assertIsString($task['custom_class']);
+            $this->assertDoesNotMatchRegularExpression('/\s/', $task['custom_class']);
+        }
     }
 
     public function test_kiel_user_can_drag_or_resize_timeline_dates(): void

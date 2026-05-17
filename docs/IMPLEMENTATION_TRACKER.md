@@ -60,3 +60,10 @@ Production hardening and deployment preparation.
 - updated route/controller: `TicketController@drawer` now renders `view('tickets.partials.drawer-content', [...])` for AJAX drawer HTML, with the required ticket/timer/block/comment/team/recommendation payload variables.
 - verification: mode-based usages were removed from the codebase search; `/tickets` shell include remains intact; view cache clear commands were attempted but could not run in this container because `vendor/autoload.php` is missing.
 - next planned task unchanged: Production hardening and deployment preparation.
+
+## Issue: Frappe Gantt custom_class cannot contain spaces
+
+- issue: Frappe Gantt calls `classList.add(task.custom_class)`, so multi-class `custom_class` values with spaces break timeline rendering with a DOMTokenList token error.
+- fix: updated timeline task payload generation to emit single-token urgency classes with blocked/overdue suffixes (for example, `timeline-urgency-high-blocked`) instead of space-joined class lists.
+- verification: timeline task payload assertions now enforce that every `custom_class` exists, is a string, and contains no whitespace; timeline styling selectors were updated to target the single-token variants so bars retain urgency, blocked, and overdue visual distinctions.
+- next planned task unchanged: Production hardening and deployment preparation.
