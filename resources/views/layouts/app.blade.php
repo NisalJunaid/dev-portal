@@ -21,6 +21,7 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ config('app.name', 'Kiel Portal') }}</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+    <style>[x-cloak]{display:none !important;}</style>
 </head>
 <body>
     <div x-data="{ sidebarOpen: false }" class="min-h-screen bg-slate-50">
