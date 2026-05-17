@@ -140,3 +140,21 @@ Production hardening and deployment preparation.
 
 ### Next planned task
 Production hardening and deployment preparation.
+
+## Issue: `/tasks` undefined `Ticket::visibleTo` scope
+
+### Summary
+- issue: `TaskWorkspaceController` called `Ticket::query()->visibleTo($request->user())` but `Ticket` did not implement a `scopeVisibleTo`, causing `Call to undefined method Illuminate\\Database\\Eloquent\\Builder::visibleTo()` on `/tasks`.
+- fix: added `scopeVisibleTo(Builder $query, User $user): Builder` to `app/Models/Ticket.php` with Kiel-team full visibility and client-scoped isolation by `client_id` for non-Kiel users.
+- verified User role helpers: confirmed `User::isKielUser()` and `User::isClientUser()` already exist in `app/Models/User.php`; no duplication added.
+- fixed teamMembers query: replaced invalid `User::ROLE_KIEL_TEAM`-based filter with Spatie role query (`User::role(['super_admin', 'kiel_manager', 'developer'])`).
+- project-wide check: searched for `->visibleTo(` usage and confirmed only `TaskWorkspaceController` uses it, now backed by the new Ticket scope.
+
+### Tests/checks run
+- `php artisan view:clear` (failed in this container: missing `vendor/autoload.php`).
+- `php artisan optimize:clear` (failed in this container: missing `vendor/autoload.php`).
+- `php artisan route:list` (failed in this container: missing `vendor/autoload.php`).
+- `php artisan test` (failed in this container: missing `vendor/autoload.php`).
+
+### Next planned task
+Production hardening and deployment preparation.

@@ -75,7 +75,7 @@ class TaskWorkspaceController extends Controller
             'activeView' => $activeView,
             'tickets' => $tickets,
             'isKielUser' => $request->user()->isKielUser(),
-            'teamMembers' => User::query()->where('role', User::ROLE_KIEL_TEAM)->orderBy('name')->get(['id', 'name']),
+            'teamMembers' => User::role(['super_admin', 'kiel_manager', 'developer'])->orderBy('name')->get(['id', 'name']),
             'clients' => Client::query()->when(! $request->user()->isKielUser(), fn ($q) => $q->whereKey($request->user()->client_id))->orderBy('name')->get(['id', 'name']),
             'softwares' => Software::query()->when(! $request->user()->isKielUser(), fn ($q) => $q->where('client_id', $request->user()->client_id))->orderBy('name')->get(['id', 'name']),
             'filters' => $filters,
