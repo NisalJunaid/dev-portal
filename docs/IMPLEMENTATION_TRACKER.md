@@ -380,3 +380,25 @@ Production hardening and deployment preparation.
 
 ### Next planned task
 Production hardening and deployment preparation.
+
+## Completed: Sprint planning/task model correction pass
+
+### Summary
+- Separated planning features from implementation tasks in workspace queries.
+- Moved feature request entry point to Sprints planning dashboard and removed it from Tasks page.
+- Added current sprint strips/timer hooks and sprint pause/resume/end endpoints.
+- Updated sprint completion counting to use done-state helper for generated tasks and bugs.
+- Confirmed start-sprint conversion remains feature->generated task with source linkage.
+
+### Checks run
+- php -l app/Http/Controllers/SprintController.php
+- php -l app/Http/Controllers/TaskWorkspaceController.php
+- php -l app/Models/Sprint.php
+- php -l app/Models/Ticket.php
+- php -l app/Http/Controllers/FeatureController.php
+
+### Known issues
+- Full artisan/phpunit execution still depends on local vendor availability.
+
+### Next planned task
+Production hardening and deployment preparation.
