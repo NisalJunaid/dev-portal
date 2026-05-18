@@ -731,3 +731,23 @@ Production hardening and deployment preparation.
 
 ### Next planned task
 Production hardening and deployment preparation.
+
+## Issue: `/tasks` list partial Blade parse error (`unexpected token "endforeach"`)
+
+### Summary
+- fixed Blade directive-balance and parse fragility in `resources/views/tasks/partials/list-view.blade.php` by refactoring compressed one-line directives/markup into explicit multiline `@php`, `@if`, and `@foreach` blocks.
+- replaced inline section variable directive with multiline form:
+  - from: `@php($sectionTickets = $groupedTickets->get($sectionKey, collect()))`
+  - to: multiline `@php ... @endphp` assignment.
+- simplified field-menu button triggers for status and assignee updates to dataset-driven Alpine handling (`@click.stop="openFieldMenuFromDataset($event)"`) to avoid brittle large inline config objects in Blade attributes.
+- added `openFieldMenuFromDataset(event)` in `resources/views/tasks/index.blade.php` taskWorkspace Alpine component to parse `data-*` attributes and call existing `openFieldMenu` safely.
+- ensured list section/ticket loops and all conditional/php blocks are visibly balanced.
+
+### Tests/checks run
+- `php artisan view:clear` *(failed in this container: missing `vendor/autoload.php`)*
+- `php artisan optimize:clear` *(failed in this container: missing `vendor/autoload.php`)*
+- `php artisan test` *(failed in this container: missing `vendor/autoload.php`)*
+- `php artisan route:list` *(failed in this container: missing `vendor/autoload.php`)*
+
+### Next planned task
+Production hardening and deployment preparation.
