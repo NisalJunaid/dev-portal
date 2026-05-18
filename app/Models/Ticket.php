@@ -216,6 +216,18 @@ class Ticket extends Model
         return $query->whereNull('archived_at');
     }
 
+
+    public static function taskStatusRank(string $status): int
+    {
+        return match ($status) {
+            self::STATUS_BACKLOG => 1,
+            self::STATUS_IN_PROGRESS => 2,
+            self::STATUS_TASK_BLOCKED => 3,
+            self::STATUS_TASK_COMPLETED, self::STATUS_REJECTED => 4,
+            default => 0,
+        };
+    }
+
     public function formattedStatus(): string
     {
         if ($this->status === self::STATUS_TASK_COMPLETED) {
@@ -257,6 +269,19 @@ class Ticket extends Model
     public function isTask(): bool
     {
         return $this->type === self::TYPE_TASK || $this->is_generated_task;
+    }
+
+
+    public function canHaveSubtasks(): bool
+    {
+        return $this->isTask()
+            && $this->parent_ticket_id === null;
+    }
+
+    public function isSubtask(): bool
+    {
+        return $this->isTask()
+            && $this->parent_ticket_id !== null;
     }
 
     public function isParentFeature(): bool
