@@ -3,6 +3,10 @@
 @tailwind utilities;
 
 @layer base {
+    :root {
+        --app-header-height: 5rem;
+    }
+
     body {
         @apply bg-slate-50 text-slate-900 antialiased;
     }
@@ -10,7 +14,16 @@
 
 @layer components {
     .app-shell-link {
-        @apply flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-600 transition duration-150 ease-out hover:bg-white hover:text-slate-950 hover:shadow-sm;
+        @apply flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-600 hover:bg-white hover:text-slate-950 hover:shadow-sm;
+        transition:
+            background-color 150ms ease,
+            color 150ms ease,
+            border-color 150ms ease,
+            transform 150ms ease;
+    }
+
+    .app-shell-link:hover {
+        transform: translateX(1px);
     }
 
     .app-shell-link-active {
@@ -43,6 +56,21 @@
 
     .kanban-card-drag {
         @apply rotate-1 cursor-grabbing;
+    }
+
+    .app-shell-sidebar {
+        width: var(--sidebar-width, 288px);
+        transition: width 180ms ease, transform 180ms ease;
+        will-change: width, transform;
+    }
+
+    .app-shell-content {
+        padding-left: var(--content-left, 288px);
+        transition: padding-left 180ms ease;
+    }
+
+    .app-page-content {
+        animation: app-page-enter 140ms ease-out both;
     }
 }
 
@@ -163,6 +191,16 @@
 }
 
 body.is-column-resizing { cursor: col-resize; user-select: none; }
+body.is-resizing-sidebar .app-shell-sidebar,
+body.is-resizing-sidebar .app-shell-content {
+    transition: none !important;
+}
+
+@media (max-width: 1023px) {
+    .app-shell-content {
+        padding-left: 0;
+    }
+}
 
 
 .kanban-card:active { cursor: grabbing; }
@@ -253,3 +291,39 @@ body.is-task-list-dragging * {
 }
 
 .field-floating-menu{z-index:130;}
+
+.tasks-workspace {
+    height: calc(100vh - var(--app-header-height));
+}
+
+@keyframes app-page-enter {
+    from {
+        opacity: 0;
+        transform: translateY(4px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes app-progress {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(300%); }
+}
+
+.animate-app-progress {
+    animation: app-progress 900ms ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .app-page-content {
+        animation: none;
+    }
+
+    .app-shell-content,
+    .app-shell-sidebar {
+        transition: none !important;
+    }
+}

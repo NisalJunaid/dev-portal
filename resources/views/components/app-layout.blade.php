@@ -29,15 +29,18 @@
     <div
         x-data="appShell()"
         x-init="initShell()"
-        class="min-h-screen bg-slate-50"
-        :style="shellStyle()"
+        class="min-h-screen bg-slate-50 app-shell"
+        style="--sidebar-width: 288px; --content-left: 288px;"
     >
+        <div x-cloak x-show="pageLeaving" x-transition.opacity.duration.120ms class="fixed inset-0 z-[200] pointer-events-none bg-slate-50/60 backdrop-blur-[1px]"></div>
+        <div x-cloak x-show="pageLeaving" class="fixed left-0 top-0 z-[210] h-0.5 w-full overflow-hidden bg-transparent">
+            <div class="h-full w-1/3 animate-app-progress rounded-r-full bg-indigo-500"></div>
+        </div>
         <div x-show="sidebarOpen" x-transition.opacity class="fixed inset-0 z-30 bg-slate-950/40 lg:hidden" @click="sidebarOpen = false"></div>
 
         <aside
-            class="fixed inset-y-0 left-0 z-40 -translate-x-full border-r border-slate-200 bg-slate-100/95 px-4 py-5 transition duration-200 ease-out lg:translate-x-0"
+            class="app-shell-sidebar fixed inset-y-0 left-0 z-40 -translate-x-full border-r border-slate-200 bg-slate-100/95 px-4 py-5 transition duration-200 ease-out lg:translate-x-0"
             :class="{ 'translate-x-0': sidebarOpen }"
-            :style="sidebarStyle()"
         >
             <div class="flex items-center justify-between px-2">
                 <div class="flex items-center gap-3 overflow-hidden">
@@ -55,7 +58,7 @@
             <nav class="mt-8 space-y-1">
                 @foreach ($menuItems as $item)
                     @if ($item['permission'] === null || auth()->user()->can($item['permission']))
-                        <a href="{{ route($item['route']) }}" @class(['app-shell-link', 'app-shell-link-active' => $item['active']])>
+                        <a href="{{ route($item['route']) }}" data-app-nav-link @click="handleNavClick($event)" @class(['app-shell-link', 'app-shell-link-active' => $item['active']])>
                             <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-slate-200/80 text-xs font-black text-slate-500">{{ $item['icon'] }}</span>
                             <span x-show="!sidebarCollapsed" x-transition.opacity>{{ $item['label'] }}</span>
                         </a>
@@ -66,8 +69,8 @@
             <div class="absolute right-0 top-0 hidden h-full w-1 cursor-col-resize bg-transparent hover:bg-indigo-200 lg:block" @mousedown.prevent="startResize"></div>
         </aside>
 
-        <div :style="contentStyle()">
-            <header class="sticky top-0 z-20 border-b border-slate-200 bg-slate-50/85 backdrop-blur">
+        <div class="app-shell-content">
+            <header class="sticky top-0 z-20 h-20 border-b border-slate-200 bg-slate-50/85 backdrop-blur">
                 <div class="flex h-20 items-center justify-between px-4 sm:px-6 lg:px-8">
                     <div class="flex items-center gap-4">
                         <button type="button" class="rounded-2xl border border-slate-200 bg-white p-2 text-slate-600 shadow-sm lg:hidden" @click="sidebarOpen = true">
@@ -93,7 +96,7 @@
                 </div>
             </header>
 
-            <main class="px-4 py-8 sm:px-6 lg:px-8">
+            <main class="app-page-content px-4 py-8 sm:px-6 lg:px-8">
                 {{ $slot }}
             </main>
         </div>
@@ -109,47 +112,62 @@
                 sidebarMaxWidth: 420,
                 collapsedWidth: 80,
                 isResizing: false,
+                pageLeaving: false,
                 initShell() {
                     this.sidebarCollapsed = localStorage.getItem('kiel.sidebar.collapsed') === '1';
                     const savedWidth = Number.parseInt(localStorage.getItem('kiel.sidebar.width') || '', 10);
                     if (!Number.isNaN(savedWidth)) {
                         this.sidebarWidth = this.clampWidth(savedWidth);
                     }
+                    this.applyShellVars();
                 },
                 clampWidth(width) {
                     return Math.min(this.sidebarMaxWidth, Math.max(this.sidebarMinWidth, width));
                 },
-                shellStyle() {
+                applyShellVars() {
                     const width = this.sidebarCollapsed ? this.collapsedWidth : this.sidebarWidth;
-                    return `--sidebar-width: ${width}px; --content-left: ${width}px;`;
-                },
-                sidebarStyle() {
-                    return `width: var(--sidebar-width);`;
-                },
-                contentStyle() {
-                    return `padding-left: var(--content-left);`;
+                    this.$el.style.setProperty('--sidebar-width', `${width}px`);
+                    this.$el.style.setProperty('--content-left', `${width}px`);
                 },
                 toggleCollapsed() {
                     this.sidebarCollapsed = !this.sidebarCollapsed;
                     localStorage.setItem('kiel.sidebar.collapsed', this.sidebarCollapsed ? '1' : '0');
+                    this.applyShellVars();
                 },
                 startResize(event) {
                     if (this.sidebarCollapsed) return;
                     this.isResizing = true;
-                    document.body.classList.add('select-none');
+                    document.body.classList.add('select-none', 'is-resizing-sidebar');
                     const onMove = (moveEvent) => {
                         if (!this.isResizing) return;
                         this.sidebarWidth = this.clampWidth(moveEvent.clientX);
+                        this.applyShellVars();
                     };
                     const onUp = () => {
                         this.isResizing = false;
                         localStorage.setItem('kiel.sidebar.width', String(this.sidebarWidth));
-                        document.body.classList.remove('select-none');
+                        document.body.classList.remove('select-none', 'is-resizing-sidebar');
                         window.removeEventListener('mousemove', onMove);
                         window.removeEventListener('mouseup', onUp);
                     };
                     window.addEventListener('mousemove', onMove);
                     window.addEventListener('mouseup', onUp);
+                },
+                handleNavClick(event) {
+                    const link = event.currentTarget;
+                    if (
+                        event.defaultPrevented ||
+                        event.metaKey ||
+                        event.ctrlKey ||
+                        event.shiftKey ||
+                        event.altKey ||
+                        link.target === '_blank'
+                    ) {
+                        return;
+                    }
+                    const href = link?.getAttribute('href');
+                    if (!href || href === window.location.href) return;
+                    this.pageLeaving = true;
                 },
             };
         }
