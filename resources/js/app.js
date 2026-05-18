@@ -126,6 +126,25 @@ const listSectionForTicket = (ticket = {}) => {
 };
 
 
+
+const statusOptionCatalog = {
+    backlog: { label: 'Backlog', className: 'badge-status-backlog' },
+    in_progress: { label: 'In Progress', className: 'badge-status-in-progress' },
+    task_blocked: { label: 'Blocked', className: 'badge-status-blocked' },
+    feature_blocked: { label: 'Blocked', className: 'badge-status-blocked' },
+    bug_blocked: { label: 'Blocked', className: 'badge-status-blocked' },
+    task_completed: { label: 'Completed', className: 'badge-status-completed' },
+    feature_completed: { label: 'Completed', className: 'badge-status-completed' },
+    bug_completed: { label: 'Completed', className: 'badge-status-completed' },
+    rejected: { label: 'Rejected', className: 'badge-status-rejected' },
+    next_sprint: { label: 'Move to Next Sprint', className: 'badge-status-next-sprint' },
+    bug_pending: { label: 'Pending', className: 'badge-status-backlog' },
+};
+const statusOptionsForType = (type) => {
+    if (type === 'bug') return ['bug_pending','in_progress','bug_blocked','bug_completed','rejected'].map((k)=>({value:k,...statusOptionCatalog[k]}));
+    if (type === 'feature') return ['feature_approved','recommended','next_sprint','feature_blocked','feature_completed','rejected'].map((k)=>({value:k,label:statusOptionCatalog[k]?.label||k.replace('_',' '),className:statusOptionCatalog[k]?.className||'badge-status'}));
+    return ['backlog','in_progress','task_blocked','task_completed','rejected','next_sprint'].map((k)=>({value:k,...statusOptionCatalog[k]}));
+};
 const bindAjaxActions = () => {
     document.addEventListener('submit', async (event) => {
         const form = event.target.closest('form[data-ajax-action]');
@@ -345,6 +364,7 @@ window.KielKanban = {
 window.KielTimeline = { initAll() { document.querySelectorAll('[data-timeline-view]').forEach(() => {}); } };
 
 window.KielTaskList = {
+    statusOptionsForType,
     updateListRowFromPayload(row, ticket) {
         if (!row || !ticket) return;
         const section = listSectionForTicket(ticket);
@@ -359,7 +379,7 @@ window.KielTaskList = {
         const ticketNo = row.querySelector('[data-list-ticket-no]');
         if (ticketNo && ticket.ticket_no) ticketNo.textContent = ticket.ticket_no;
     },
-    moveListRowToSection(row, sectionKey, index = null) {
+    moveRowToSection(row, sectionKey, index = null) {
         const targetBody = document.querySelector(`[data-list-section-body][data-section="${sectionKey}"]`);
         if (!targetBody || !row) return;
         targetBody.querySelector('[data-list-empty-row]')?.remove();
@@ -378,20 +398,28 @@ window.KielTaskList = {
             }
         });
     },
-    updateListSectionCounts() {
+    updateCounts() {
         document.querySelectorAll('[data-list-section]').forEach((section) => {
             const count = section.querySelectorAll('[data-list-task-row]').length;
             section.querySelector('[data-list-section-count]')?.replaceChildren(String(count));
         });
         this.updateListEmptyStates();
     },
+    applyTicketUpdate(ticket, row = null) {
+        const targetRow = row || document.querySelector(`[data-list-task-row][data-ticket-id="${ticket?.id}"]`);
+        if (!targetRow || !ticket) return;
+        const section = listSectionForTicket(ticket);
+        this.moveRowToSection(targetRow, section);
+        this.updateListRowFromPayload(targetRow, ticket);
+        this.updateCounts();
+    },
     restoreListRow(row, previousSection, previousIndex) {
-        this.moveListRowToSection(row, previousSection, previousIndex);
-        this.updateListSectionCounts();
+        this.moveRowToSection(row, previousSection, previousIndex);
+        this.updateCounts();
     },
     async initAll(force = false) {
         await loadSortable().catch(() => window.Kiel.toast('List drag/drop unavailable.', 'error'));
-        this.updateListSectionCounts();
+        this.updateCounts();
         document.querySelectorAll('[data-list-section-body]').forEach((body) => {
             if (force && body._kielSortable) { body._kielSortable.destroy(); body._kielSortable = null; }
             if (body._kielSortable || !window.Sortable) return;
@@ -412,14 +440,14 @@ window.KielTaskList = {
                         const payload = await window.Kiel.request(row.dataset.moveUrl, { method: 'PATCH', body: JSON.stringify({ field: 'status', value: status }) });
                         if (payload.removed_from_tasks) {
                             row.remove();
-                            this.updateListSectionCounts();
+                            this.updateCounts();
                             window.KielTasks.emitRemoved(payload.ticket.id, 'moved_to_next_sprint');
                             return;
                         }
                         const newSection = listSectionForTicket(payload.ticket || {});
-                        this.moveListRowToSection(row, newSection, evt.newIndex ?? null);
+                        this.moveRowToSection(row, newSection, evt.newIndex ?? null);
                         this.updateListRowFromPayload(row, payload.ticket);
-                        this.updateListSectionCounts();
+                        this.updateCounts();
                         window.KielTasks.emitTaskUpdated(payload.ticket);
                     } catch (e) {
                         window.Kiel.toast(e.message || 'Unable to move task.', 'error');
@@ -438,10 +466,10 @@ window.addEventListener('kiel:task-updated', (event) => {
     document.querySelectorAll(`[data-list-task-row][data-ticket-id="${ticket.id}"]`).forEach((row) => {
         if (ticket.removed_from_tasks) { row.remove(); return; }
         const section = listSectionForTicket(ticket);
-        window.KielTaskList.moveListRowToSection(row, section);
+        window.KielTaskList.moveRowToSection(row, section);
         window.KielTaskList.updateListRowFromPayload(row, ticket);
     });
-    window.KielTaskList.updateListSectionCounts();
+    window.KielTaskList.updateCounts();
     window.KielTasks.markDirty('board');
     window.KielTasks.markDirty('timeline');
     window.KielKanban?.initAll(true);
@@ -449,7 +477,24 @@ window.addEventListener('kiel:task-updated', (event) => {
 window.addEventListener('kiel:task-removed', (event) => {
     document.querySelectorAll(`[data-list-task-row][data-ticket-id="${event.detail.ticketId}"]`).forEach((el) => el.remove());
     document.querySelectorAll(`[data-kanban-card][data-ticket-id="${event.detail.ticketId}"]`).forEach((el) => el.remove());
-    window.KielTaskList.updateListSectionCounts();
+    window.KielTaskList.updateCounts();
     window.KielTasks.markDirty('board');
     window.KielTasks.markDirty('timeline');
+});
+
+
+const closeAllStatusMenus = () => document.querySelectorAll('[data-list-status-menu]').forEach((m)=>m.remove());
+document.addEventListener('click', (e)=> { if (!e.target.closest('[data-list-status-trigger]') && !e.target.closest('[data-list-status-menu]')) closeAllStatusMenus(); });
+document.addEventListener('keydown', (e)=> { if (e.key === 'Escape') closeAllStatusMenus(); });
+document.addEventListener('click', async (event) => {
+    const trigger = event.target.closest('[data-list-status-trigger]');
+    if (!trigger) return;
+    event.preventDefault(); event.stopPropagation();
+    const row = trigger.closest('[data-list-task-row]'); if (!row) return;
+    const existing = row.querySelector('[data-list-status-menu]'); closeAllStatusMenus(); if (existing) return;
+    const menu = document.createElement('div');
+    menu.className = 'absolute right-0 top-9 z-50 w-56 rounded-lg border border-slate-200 bg-white shadow-lg p-1';
+    menu.setAttribute('data-list-status-menu','1');
+    statusOptionsForType(row.dataset.ticketType).forEach((opt)=>{ const btn=document.createElement('button'); btn.type='button'; btn.className='flex w-full items-center justify-between rounded px-2 py-1.5 text-left text-xs hover:bg-slate-50'; btn.innerHTML=`<span>${opt.label}</span>`; btn.addEventListener('click', async (ev)=>{ev.preventDefault(); ev.stopPropagation(); if(opt.value===row.dataset.currentStatus){closeAllStatusMenus(); return;} try{const payload=await window.Kiel.request(row.dataset.moveUrl,{method:'PATCH',body:JSON.stringify({field:'status', value:opt.value})}); if(payload.removed_from_tasks){row.remove();window.KielTaskList.updateCounts();window.KielTasks.emitRemoved(payload.ticket.id,'moved_to_next_sprint');return;} window.KielTaskList.applyTicketUpdate(payload.ticket,row); window.KielTasks.emitTaskUpdated(payload.ticket); window.Kiel.toast(payload.message||'Status updated.');}catch(err){window.Kiel.toast(err.message||'Unable to update status.','error');} finally {closeAllStatusMenus();}}); menu.appendChild(btn); });
+    trigger.parentElement.appendChild(menu);
 });

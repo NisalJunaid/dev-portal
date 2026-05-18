@@ -542,3 +542,24 @@ Production hardening and deployment preparation.
 
 ### Next planned task
 Production hardening and deployment preparation.
+
+## Completed: Task workspace status + column UX alignment
+
+### Summary
+- Restyled List view Columns dropdown to match compact grouped List UI patterns.
+- Fixed Kanban mapping so `task_completed` tickets land in the generic `completed` column and `task_blocked` maps to `blocked`.
+- Added clickable List status pill dropdown with expanded status options (blocked/rejected/next sprint/pending where valid by type).
+- Enhanced inline update payload to include both `list_section` and Kanban `column` for cross-view syncing.
+- Improved shared list helpers usage and added regression coverage for completed/blocked/next-sprint task status flows.
+
+### Tests/checks run
+- `php artisan test`
+- `php artisan route:list`
+- `php artisan view:clear`
+- `php artisan optimize:clear`
+
+### Known issues
+- If local dependencies under `vendor/` are unavailable, artisan/test commands will fail before app boot.
+
+### Next planned task
+Production hardening and deployment preparation.

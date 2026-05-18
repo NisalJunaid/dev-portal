@@ -27,17 +27,19 @@
                             <span x-show="$store.taskColumns.hiddenCount() > 0" class="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-indigo-500"></span>
                         </button>
 
-                        <div x-cloak x-show="openMenu === 'listColumns' && activeView === 'list'" @click.stop x-transition.opacity.duration.150ms class="absolute right-0 top-12 z-50 w-64 rounded-xl border border-slate-200 bg-white p-3 shadow-xl">
-                            <p class="mb-2 text-xs font-black uppercase tracking-widest text-slate-500">Visible columns</p>
+                        <div x-cloak x-show="openMenu === 'listColumns' && activeView === 'list'" @click.stop x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" x-transition:leave="transition ease-in duration-100" x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95" class="absolute right-0 top-12 z-50 w-64 rounded-lg border border-slate-200 bg-white p-2 shadow-lg">
+                            <div class="mb-1 flex items-center justify-between px-1">
+                                <p class="text-xs font-bold text-slate-600">Columns</p>
+                                <button type="button" class="text-xs font-semibold text-indigo-600 hover:text-indigo-700" @click.stop="$store.taskColumns.reset()">Reset</button>
+                            </div>
                             <div class="max-h-72 space-y-1 overflow-y-auto sleek-scrollbar">
                                 <template x-for="column in $store.taskColumns.columns" :key="column.key">
-                                    <label class="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-50">
+                                    <label class="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-50">
                                         <input type="checkbox" class="rounded border-slate-300 text-indigo-600" :checked="$store.taskColumns.isVisible(column.key)" @change.stop="$store.taskColumns.toggle(column.key)">
                                         <span x-text="column.label"></span>
                                     </label>
                                 </template>
                             </div>
-                            <button type="button" class="mt-3 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50" @click.stop="$store.taskColumns.reset()">Reset columns</button>
                         </div>
                     </div>
 
