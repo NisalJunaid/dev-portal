@@ -118,7 +118,7 @@ class SprintController extends Controller
             $backlog = $currentSprint->tickets->where('status', Ticket::STATUS_BACKLOG)->count();
             $blocked = $currentSprint->tickets->filter(fn (Ticket $ticket) => $ticket->isBlocked())->count();
             $rejected = $currentSprint->tickets->where('status', Ticket::STATUS_REJECTED)->count();
-            $active = $currentSprint->tickets->filter(fn (Ticket $ticket) => $ticket->isActiveForSprint())->count();
+            $active = $currentSprint->activeItemsCount();
 
             $currentSprintStats = [
                 'total_tasks' => $total,
@@ -129,7 +129,7 @@ class SprintController extends Controller
                 'rejected_tasks' => $rejected,
                 'remaining_tasks' => $active,
                 'active_count' => $active,
-                'can_end' => $active === 0,
+                'can_end' => $currentSprint->canEnd(),
                 'elapsed_seconds' => $currentSprint->elapsedSeconds(),
                 'timer_status' => $currentSprint->timer_status,
             ];
@@ -230,13 +230,13 @@ class SprintController extends Controller
         $this->authorizeSprintAccess($request, $sprint);
         abort_unless($sprint->status === Sprint::STATUS_IN_PROGRESS, Response::HTTP_UNPROCESSABLE_ENTITY);
         $sprint->load('tickets');
-        $activeItems = $sprint->tickets->filter(fn (Ticket $ticket) => $ticket->isActiveForSprint())->values();
-        if ($activeItems->isNotEmpty()) {
+        if (! $sprint->canEnd()) {
+            $activeItems = $sprint->tickets->filter(fn (Ticket $ticket) => $ticket->isActiveForSprint())->values();
             $message = 'Sprint cannot be ended until all sprint tasks are completed, rejected, or blocked.';
             if ($request->expectsJson()) {
                 return response()->json([
                     'message' => $message,
-                    'active_count' => $activeItems->count(),
+                    'active_count' => $sprint->activeItemsCount(),
                     'active_items' => $activeItems->take(5)->pluck('ticket_no')->values(),
                 ], 422);
             }
