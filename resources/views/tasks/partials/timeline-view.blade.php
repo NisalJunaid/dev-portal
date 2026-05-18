@@ -6,6 +6,8 @@
 .gantt .bar.timeline-urgency-high,.gantt .timeline-urgency-high .bar,.gantt .bar.timeline-urgency-high-blocked,.gantt .timeline-urgency-high-blocked .bar,.gantt .bar.timeline-urgency-high-overdue,.gantt .timeline-urgency-high-overdue .bar{fill:#fed7aa}
 .gantt .bar.timeline-urgency-medium,.gantt .timeline-urgency-medium .bar,.gantt .bar.timeline-urgency-medium-blocked,.gantt .timeline-urgency-medium-blocked .bar,.gantt .bar.timeline-urgency-medium-overdue,.gantt .timeline-urgency-medium-overdue .bar{fill:#c7d2fe}
 .gantt .bar.timeline-urgency-low,.gantt .timeline-urgency-low .bar,.gantt .bar.timeline-urgency-low-blocked,.gantt .timeline-urgency-low-blocked .bar,.gantt .bar.timeline-urgency-low-overdue,.gantt .timeline-urgency-low-overdue .bar{fill:#a7f3d0}
+.timeline-previous-sprint .bar,.gantt .bar.timeline-previous-sprint{fill:rgba(148,163,184,.22)!important;stroke:rgba(100,116,139,.35)!important}
+.timeline-previous-sprint .bar-label,.gantt .timeline-previous-sprint .bar-label{fill:#475569!important}
 .gantt .bar-label{fill:#0f172a !important;font-weight:800}.gantt .bar{stroke:rgba(15,23,42,.12);stroke-width:1}.gantt .bar-wrapper.timeline-urgency-critical-blocked .bar,.gantt .bar-wrapper.timeline-urgency-high-blocked .bar,.gantt .bar-wrapper.timeline-urgency-medium-blocked .bar,.gantt .bar-wrapper.timeline-urgency-low-blocked .bar{stroke-dasharray:5 3}
 </style>
 

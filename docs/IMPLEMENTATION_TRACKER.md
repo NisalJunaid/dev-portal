@@ -608,3 +608,35 @@ Production hardening and deployment preparation.
 
 ### Next planned task
 Production hardening and deployment preparation.
+
+## Completed: Tasks workspace sprint-scope filtering + timer/controls refinement
+
+### Summary
+- Default task scope now resolves to `current_sprint` and is applied across List, Board, and Timeline flows.
+- Added scope-aware filtering options (`current_sprint`, `all`, `unsprinted`, `completed_sprints`, `sprint`) with safe fallback to `current_sprint` when `scope=sprint` is missing `sprint_id`.
+- Timeline payload now includes sprint context metadata and marks previous/completed sprint tasks for gray styling via single-token `custom_class` (`timeline-previous-sprint`).
+- Refined Tasks filters to include Scope + Sprint selectors and reset behavior to current sprint default.
+- Updated sprint action buttons to minimal SVG icon buttons for Tasks and Sprints panels.
+- Refined list column labels to match grouped-list architecture and removed obsolete labels.
+
+### Files changed
+- `app/Http/Controllers/TaskWorkspaceController.php`
+- `app/Services/KanbanService.php`
+- `app/Services/TimelineService.php`
+- `app/Http/Controllers/TimelineController.php`
+- `resources/views/tasks/index.blade.php`
+- `resources/views/tasks/partials/timeline-view.blade.php`
+- `resources/views/sprints/partials/current-sprint.blade.php`
+- `resources/js/app.js`
+
+### Tests/checks run
+- `php artisan test`
+- `php artisan route:list`
+- `php artisan view:clear`
+- `php artisan optimize:clear`
+
+### Known issues
+- Artisan/test execution may fail in environments without Composer `vendor/` dependencies.
+
+### Next planned task
+Production hardening and deployment preparation.

@@ -16,6 +16,7 @@ use Illuminate\Validation\ValidationException;
 
 class TimelineController extends Controller
 {
+    private const SCOPES = ['current_sprint', 'all', 'unsprinted', 'completed_sprints', 'sprint'];
     public function __construct(private readonly TimelineService $timelineService)
     {
     }
@@ -32,6 +33,12 @@ class TimelineController extends Controller
         abort_unless($request->user()->can('view timeline'), 403);
 
         $validated = $this->validatedFilters($request);
+        $activeSprints = Sprint::query()->where('status', Sprint::STATUS_IN_PROGRESS)
+            ->when(($validated['client_id'] ?? null) && $request->user()->isKielUser(), fn ($q, $cid) => $q->where('client_id', $cid))
+            ->when(! $request->user()->isKielUser(), fn ($q) => $q->where('client_id', $request->user()->client_id))
+            ->get(['id']);
+        $validated['scope'] = $validated['scope'] ?? 'current_sprint';
+        $validated['current_sprint_ids'] = $activeSprints->pluck('id')->all();
 
         return response()->json($this->timelineService->ganttPayload($request->user(), $validated));
     }
@@ -67,6 +74,7 @@ class TimelineController extends Controller
             'client_id' => ['nullable', 'integer', Rule::exists('clients', 'id')],
             'software_id' => ['nullable', 'integer', Rule::exists('softwares', 'id')],
             'sprint_id' => ['nullable', 'integer', Rule::exists('sprints', 'id')],
+            'scope' => ['nullable', Rule::in(self::SCOPES)],
             'assigned_to' => ['nullable', 'string', 'max:32'],
             'urgency' => ['nullable', Rule::in(Ticket::URGENCIES)],
             'status' => ['nullable', Rule::in(Ticket::STATUSES)],
