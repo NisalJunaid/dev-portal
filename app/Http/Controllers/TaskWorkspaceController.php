@@ -79,7 +79,7 @@ class TaskWorkspaceController extends Controller
             $selectedScope = 'current_sprint';
         }
 
-        $tickets = Ticket::query()->visibleTo($request->user())->notArchived()->with(['client', 'software', 'submitter', 'assignee', 'sprints'])->withExists(['activeBlock as is_blocked'])
+        $tickets = Ticket::query()->visibleTo($request->user())->notArchived()->with(['client', 'software', 'submitter', 'assignee', 'sprints', 'parent', 'children', 'children.assignee', 'children.client', 'children.software', 'children.sprints'])->withExists(['activeBlock as is_blocked'])
             ->when($validated['search'] ?? null, fn ($q, string $search) => $q->where(fn ($q) => $q->where('ticket_no', 'like', '%'.$search.'%')->orWhere('title', 'like', '%'.$search.'%')))
             ->where('type', $workType === 'bugs' ? Ticket::TYPE_BUG : Ticket::TYPE_TASK)
             ->when($validated['urgency'] ?? null, fn ($q, string $urgency) => $q->where('urgency', $urgency))

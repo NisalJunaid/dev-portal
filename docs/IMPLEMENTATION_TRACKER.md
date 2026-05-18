@@ -797,3 +797,35 @@ Production hardening and deployment preparation.
 
 ### Next planned task
 Production hardening and deployment preparation.
+
+## Completed: Asana-like subtask hierarchy + minimal drawer action bar
+
+### Summary
+- list view now renders hierarchical parent-first rows with subtasks directly under each parent within each status section.
+- child rows now have a compact indent + elbow connector, and orphan subtasks render safely with a parent reference label.
+- task list drag/drop placement now preserves parent/child grouping in target sections where parent is present.
+- drawer UI was simplified to a lighter, flatter visual style and timer/block controls moved to a compact top action bar.
+- realtime per-ticket drawer timer display now updates every second while timer status is running and reinitializes on drawer refresh.
+- existing drawer action attributes/flows were preserved (`data-drawer-action`, `data-drawer-action-form`, inline update behavior).
+
+### Files changed
+- `app/Http/Controllers/TaskWorkspaceController.php`
+- `resources/views/tasks/partials/list-view.blade.php`
+- `resources/views/tasks/partials/list-row.blade.php`
+- `resources/views/tickets/partials/drawer-content.blade.php`
+- `resources/views/tickets/partials/drawer.blade.php`
+- `resources/js/app.js`
+- `resources/css/app.css`
+- `docs/IMPLEMENTATION_TRACKER.md`
+
+### Tests/checks run
+- `php artisan test`
+- `php artisan route:list`
+- `php artisan view:clear`
+- `php artisan optimize:clear`
+
+### Known issues
+- Commands still depend on local Composer vendor availability in this container.
+
+### Next planned task
+Production hardening and deployment preparation.
