@@ -275,26 +275,26 @@ class Ticket extends Model
     }
 
 
-    public function listSectionKey(): string
+    public function listSectionKey(?string $workType = null): string
     {
-        if ($this->isDone()) {
-            return 'completed';
+        if ($workType === 'bugs' || $this->isBug()) {
+            return match ($this->status) {
+                self::STATUS_BUG_BLOCKED => 'blocked',
+                self::STATUS_BUG_COMPLETED, self::STATUS_REJECTED => 'completed',
+                default => 'pending',
+            };
         }
 
-        if ($this->status === self::STATUS_IN_PROGRESS) {
-            return 'in_progress';
-        }
-
+        if ($this->isDone()) return 'completed';
+        if ($this->status === self::STATUS_IN_PROGRESS) return 'in_progress';
         return 'backlog';
     }
 
-    public static function listSections(): array
+    public static function listSections(string $workType = 'tasks'): array
     {
-        return [
-            'backlog' => 'Backlog',
-            'in_progress' => 'In Progress',
-            'completed' => 'Completed',
-        ];
+        return $workType === 'bugs'
+            ? ['pending' => 'Pending', 'blocked' => 'Blocked', 'completed' => 'Completed']
+            : ['backlog' => 'Backlog', 'in_progress' => 'In Progress', 'completed' => 'Completed'];
     }
 
     public static function statusForListSection(self $ticket, string $section): string

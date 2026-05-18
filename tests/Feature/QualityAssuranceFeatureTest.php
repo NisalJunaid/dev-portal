@@ -298,6 +298,11 @@ class QualityAssuranceFeatureTest extends TestCase
         $this->assertTrue($grouped->get('completed')->contains(fn (Ticket $t) => $t->id === $task->id));
         $this->assertSame('completed', $kanban->ticketPayload($task, KanbanService::VIEW_ALL)['column']);
 
+        $bug = $this->ticket($client, $software, $clientUser, Ticket::TYPE_BUG, Ticket::STATUS_BUG_PENDING, 'Bug item');
+        $this->actingAs($developer)->patchJson(route('tickets.inline-update', $bug), ['field' => 'status', 'value' => Ticket::STATUS_BUG_BLOCKED])->assertOk()->assertJsonPath('ticket.list_section', 'blocked')->assertJsonPath('ticket.column', 'blocked');
+        $this->actingAs($developer)->patchJson(route('tickets.inline-update', $bug), ['field' => 'status', 'value' => Ticket::STATUS_BUG_COMPLETED])->assertOk()->assertJsonPath('ticket.list_section', 'completed')->assertJsonPath('ticket.column', 'completed');
+        $this->actingAs($developer)->patchJson(route('tickets.inline-update', $bug), ['field' => 'assigned_to', 'value' => (string) $developer->id)->assertOk()->assertJsonPath('ticket.assignee_name', $developer->name);
+        $this->actingAs($developer)->getJson(route('tasks.partial', ['work_type' => 'bugs', 'view' => 'board']))->assertOk()->assertJsonPath('work_type', 'bugs')->assertJsonPath('board_columns.0.key', 'pending');
         $this->actingAs($developer)
             ->patchJson(route('tickets.inline-update', $task), ['field' => 'status', 'value' => Ticket::STATUS_TASK_COMPLETED])
             ->assertOk()
