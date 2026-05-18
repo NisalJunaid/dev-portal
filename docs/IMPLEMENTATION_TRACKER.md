@@ -862,3 +862,26 @@ Production hardening and deployment preparation.
 
 ### Next planned task
 Production hardening and deployment preparation.
+
+## Issue: fatal `Ticket::isSubtask()` redeclare
+
+### Summary
+- fixed duplicate `Ticket::isSubtask()` method declaration in `app/Models/Ticket.php` by removing the second duplicate and keeping a single canonical implementation:
+  - `isSubtask()` returns `isTask() && parent_ticket_id !== null`.
+- verified related Ticket helper methods remain present and singular in the model:
+  - `isTask()`
+  - `isParentFeature()`
+  - `isSubFeature()`
+  - `canHaveSubtasks()`
+  - `isSubtask()`
+- additionally scanned for duplicate method declarations introduced by recent changes for:
+  - `isSubtask`, `isTask`, `isDone`, `isBlocked`, `isTerminalForSprint`.
+
+### Tests/checks run
+- `rg -n "function (isSubtask|isTask|isDone|isBlocked|isTerminalForSprint|canHaveSubtasks|isParentFeature|isSubFeature)" app/Models/Ticket.php`
+- `php artisan optimize:clear` *(failed in this container: missing `vendor/autoload.php`)*
+- `php artisan view:clear` *(failed in this container: missing `vendor/autoload.php`)*
+- `php artisan test` *(failed in this container: missing `vendor/autoload.php`)*
+
+### Next planned task
+Production hardening and deployment preparation.
