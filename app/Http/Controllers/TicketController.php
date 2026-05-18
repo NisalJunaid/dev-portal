@@ -445,6 +445,16 @@ class TicketController extends Controller
         $oldValue = $ticket->{$field};
         $normalizedValue = $value === '' ? null : $value;
 
+        if ($field === 'status' && $normalizedValue === Ticket::STATUS_NEXT_SPRINT && $ticket->isBug()) {
+            throw ValidationException::withMessages([
+                'status' => 'Bugs cannot be moved to Next Sprint.',
+            ]);
+        }
+
+        if ($field === 'status' && $normalizedValue === Ticket::STATUS_NEXT_SPRINT && $ticket->isTask()) {
+            return $this->moveTaskToNextSprintFeature($request, $ticket);
+        }
+
         DB::transaction(function () use ($ticket, $field, $normalizedValue, $oldValue, $request) {
             $updates = [$field => $normalizedValue];
 
@@ -530,7 +540,7 @@ class TicketController extends Controller
             'assigned_to' => ['nullable', Rule::exists('users', 'id')],
             'start_date' => ['nullable', 'date'],
             'due_date' => ['nullable', 'date'],
-            'status' => ['required', Rule::in($ticket->isBug() ? Ticket::BUG_STATUSES : ($ticket->isFeature() ? Ticket::FEATURE_STATUSES : Ticket::STATUSES))],
+            'status' => ['required', Rule::in($ticket->isBug() ? Ticket::BUG_STATUSES : ($ticket->isFeature() ? Ticket::FEATURE_STATUSES : array_values(array_unique(array_merge(Ticket::TASK_STATUSES, [Ticket::STATUS_FEATURE_BLOCKED, Ticket::STATUS_REJECTED, Ticket::STATUS_NEXT_SPRINT])))))],
         };
     }
 
@@ -565,10 +575,59 @@ class TicketController extends Controller
             'due_date_overdue' => $ticket->due_date !== null && $ticket->due_date->isPast() && ! in_array($ticket->status, [Ticket::STATUS_BUG_COMPLETED, Ticket::STATUS_FEATURE_COMPLETED], true),
             'status' => $ticket->status,
             'status_label' => $ticket->formattedStatus(),
+            'type' => $ticket->type,
+            'list_section' => $ticket->listSectionKey(),
             'blocked' => $ticket->isBlocked(),
             'sprint_cycle' => $latestSprint ? '#'.$latestSprint->sprint_no.' '.$latestSprint->name : 'No sprint',
             'updated_at' => $ticket->updated_at?->format('M j, Y g:i A'),
         ];
+    }
+
+    private function moveTaskToNextSprintFeature(Request $request, Ticket $ticket): JsonResponse
+    {
+        $feature = null;
+
+        DB::transaction(function () use ($request, $ticket, &$feature) {
+            $ticket->sprints()->detach();
+
+            if ($ticket->sourceFeature) {
+                $feature = $ticket->sourceFeature;
+                $feature->update([
+                    'status' => Ticket::STATUS_NEXT_SPRINT,
+                    'assigned_to' => $ticket->assigned_to,
+                    'urgency' => $ticket->urgency,
+                ]);
+                $this->ticketActivityService->log($feature, 'status changed', 'Feature returned to next sprint backlog.', $request->user());
+
+                $ticket->update([
+                    'status' => Ticket::STATUS_REJECTED,
+                    'rejection_reason' => 'Returned to feature request backlog for future sprint.',
+                ]);
+            } else {
+                $ticket->update([
+                    'type' => Ticket::TYPE_FEATURE,
+                    'status' => Ticket::STATUS_NEXT_SPRINT,
+                    'is_generated_task' => false,
+                    'generated_from_sprint_id' => null,
+                    'source_feature_id' => null,
+                ]);
+                $feature = $ticket;
+            }
+
+            $this->ticketActivityService->log($ticket, 'status changed', 'Task moved back to feature requests for next sprint.', $request->user());
+        });
+
+        $ticket->refresh()->load(['client', 'software', 'assignee', 'sprints']);
+        if ($feature) {
+            $feature->refresh()->load(['client', 'software', 'assignee', 'sprints']);
+        }
+
+        return response()->json([
+            'message' => 'Task moved back to feature requests for next sprint.',
+            'ticket' => $this->inlineTicketPayload($ticket),
+            'removed_from_tasks' => true,
+            'feature' => $feature ? $this->inlineTicketPayload($feature) : null,
+        ]);
     }
 
     private function visibleTickets(Request $request)

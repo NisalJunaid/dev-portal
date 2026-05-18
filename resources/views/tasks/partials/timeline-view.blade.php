@@ -2,11 +2,11 @@
 <script src="https://cdn.jsdelivr.net/npm/frappe-gantt/dist/frappe-gantt.umd.js" defer></script>
 
 <style>
-.gantt .bar.timeline-urgency-critical,.gantt .timeline-urgency-critical .bar,.gantt .bar.timeline-urgency-critical-blocked,.gantt .timeline-urgency-critical-blocked .bar,.gantt .bar.timeline-urgency-critical-overdue,.gantt .timeline-urgency-critical-overdue .bar{fill:#e11d48}
-.gantt .bar.timeline-urgency-high,.gantt .timeline-urgency-high .bar,.gantt .bar.timeline-urgency-high-blocked,.gantt .timeline-urgency-high-blocked .bar,.gantt .bar.timeline-urgency-high-overdue,.gantt .timeline-urgency-high-overdue .bar{fill:#f97316}
-.gantt .bar.timeline-urgency-medium,.gantt .timeline-urgency-medium .bar,.gantt .bar.timeline-urgency-medium-blocked,.gantt .timeline-urgency-medium-blocked .bar,.gantt .bar.timeline-urgency-medium-overdue,.gantt .timeline-urgency-medium-overdue .bar{fill:#4f46e5}
-.gantt .bar.timeline-urgency-low,.gantt .timeline-urgency-low .bar,.gantt .bar.timeline-urgency-low-blocked,.gantt .timeline-urgency-low-blocked .bar,.gantt .bar.timeline-urgency-low-overdue,.gantt .timeline-urgency-low-overdue .bar{fill:#0f766e}
-.gantt .bar-label{font-weight:800}
+.gantt .bar.timeline-urgency-critical,.gantt .timeline-urgency-critical .bar,.gantt .bar.timeline-urgency-critical-blocked,.gantt .timeline-urgency-critical-blocked .bar,.gantt .bar.timeline-urgency-critical-overdue,.gantt .timeline-urgency-critical-overdue .bar{fill:#fecdd3}
+.gantt .bar.timeline-urgency-high,.gantt .timeline-urgency-high .bar,.gantt .bar.timeline-urgency-high-blocked,.gantt .timeline-urgency-high-blocked .bar,.gantt .bar.timeline-urgency-high-overdue,.gantt .timeline-urgency-high-overdue .bar{fill:#fed7aa}
+.gantt .bar.timeline-urgency-medium,.gantt .timeline-urgency-medium .bar,.gantt .bar.timeline-urgency-medium-blocked,.gantt .timeline-urgency-medium-blocked .bar,.gantt .bar.timeline-urgency-medium-overdue,.gantt .timeline-urgency-medium-overdue .bar{fill:#c7d2fe}
+.gantt .bar.timeline-urgency-low,.gantt .timeline-urgency-low .bar,.gantt .bar.timeline-urgency-low-blocked,.gantt .timeline-urgency-low-blocked .bar,.gantt .bar.timeline-urgency-low-overdue,.gantt .timeline-urgency-low-overdue .bar{fill:#a7f3d0}
+.gantt .bar-label{fill:#0f172a !important;font-weight:800}.gantt .bar{stroke:rgba(15,23,42,.12);stroke-width:1}.gantt .bar-wrapper.timeline-urgency-critical-blocked .bar,.gantt .bar-wrapper.timeline-urgency-high-blocked .bar,.gantt .bar-wrapper.timeline-urgency-medium-blocked .bar,.gantt .bar-wrapper.timeline-urgency-low-blocked .bar{stroke-dasharray:5 3}
 </style>
 
 <div x-data="timelineView({ dataUrl: @js(route('timeline.data')), dateUrlTemplate: @js(route('timeline.tasks.dates', ['ticket' => '__TICKET__'])), dependencyUrlTemplate: @js(route('timeline.tasks.dependency', ['ticket' => '__TICKET__'])), drawerUrlTemplate: @js(route('tickets.drawer', ['ticket' => '__TICKET__'])), canEdit: @js($canEdit) })" x-init="init()" class="h-full min-h-0" data-timeline-view>

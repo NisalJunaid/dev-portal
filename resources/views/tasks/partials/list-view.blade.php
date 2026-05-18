@@ -1,271 +1,39 @@
 @php
     $query = request()->query();
     $sortUrl = function (string $column) use ($query, $sort, $direction) {
-        return route('tasks.index', array_merge($query, [
-            'sort' => $column,
-            'direction' => $sort === $column && $direction === 'asc' ? 'desc' : 'asc',
-            'page' => null,
-        ]));
+        return route('tasks.index', array_merge($query, ['sort' => $column,'direction' => $sort === $column && $direction === 'asc' ? 'desc' : 'asc','page' => null,]));
     };
     $sortIndicator = fn (string $column) => $sort === $column ? ($direction === 'asc' ? '↑' : '↓') : '↕';
-    $statusOptions = [
-        'bug' => collect(\App\Models\Ticket::BUG_STATUSES)->map(fn ($status) => ['value' => $status, 'label' => str($status)->replace('_', ' ')->headline()->toString()])->values(),
-        'feature' => collect(\App\Models\Ticket::FEATURE_STATUSES)->map(fn ($status) => ['value' => $status, 'label' => str($status)->replace('_', ' ')->headline()->toString()])->values(),
-        'all' => collect(\App\Models\Ticket::STATUSES)->map(fn ($status) => ['value' => $status, 'label' => str($status)->replace('_', ' ')->headline()->toString()])->values(),
-    ];
-    $urgencyOptions = collect(\App\Models\Ticket::URGENCIES)->map(fn ($urgency) => ['value' => $urgency, 'label' => str($urgency)->headline()->toString()])->values();
-    $teamMemberOptions = $teamMembers->map(fn ($member) => ['value' => (string) $member->id, 'label' => $member->name])->values();
+    $groupedTickets = $tickets->getCollection()->groupBy(fn ($ticket) => $ticket->listSectionKey());
 @endphp
-
-<section
-    class="asana-panel h-full min-h-0 overflow-hidden p-0"
-    x-data="ticketList({
-        canInlineEdit: @js($isKielUser),
-        urgencyOptions: @js($urgencyOptions),
-        teamMembers: @js($teamMemberOptions),
-        statusOptions: @js($statusOptions),
-    })"
->
-    @if ($tickets->count())
-        <div class="flex h-full min-h-0 flex-col">
-        <div class="tasks-scroll-area scrollbar-fade-mask flex-1 min-h-0 overflow-auto sleek-scrollbar">
-            <table class="min-w-[1800px] table-fixed divide-y divide-slate-200 text-sm">
-                <colgroup>
-                    <template x-for="column in columns" :key="'col-'+column.key">
-                        <col :data-column-key="column.key" x-show="isColumnVisible(column.key)" :style="`width:${columnWidth(column.key)}px`">
-                    </template>
-                </colgroup>
-                <thead class="bg-slate-50 text-left text-xs font-black uppercase tracking-widest text-slate-500">
-                    <tr>
-                        @foreach ([
-                            'ticket_no' => 'Ticket #',
-                            'title' => 'Title',
-                            'type' => 'Type',
-                            'urgency' => 'Urgency',
-                            'status' => 'Status',
-                            'assigned_to' => 'Assigned to',
-                            'client' => 'Client',
-                            'software' => 'Software',
-                            'start_date' => 'Start date',
-                            'due_date' => 'Due date',
-                            'sprint' => 'Sprint cycle',
-                            'blocked' => 'Blocked',
-                            'updated_at' => 'Last updated',
-                        ] as $column => $label)
-                            <th class="group relative px-4 py-4 whitespace-nowrap" x-show="isColumnVisible('{{ $column }}')" data-column-key="{{ $column }}">
-                                <a href="{{ $sortUrl($column) }}" class="inline-flex items-center gap-1 transition hover:text-indigo-700">
-                                    {{ $label }} <span aria-hidden="true">{{ $sortIndicator($column) }}</span>
-                                </a><button type="button" class="column-resize-handle" @mousedown.prevent="startResize($event, '{{ $column }}')"></button>
-                            </th>
-                        @endforeach
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-100 bg-white">
-                    @foreach ($tickets as $ticket)
-                        @php
-                            $latestSprint = $ticket->sprints->sortByDesc('sprint_no')->first();
-                            $isOverdue = $ticket->due_date && $ticket->due_date->isPast() && ! in_array($ticket->status, [\App\Models\Ticket::STATUS_BUG_COMPLETED, \App\Models\Ticket::STATUS_FEATURE_COMPLETED], true);
-                            $rowStatusOptions = $ticket->isBug() ? $statusOptions['bug'] : ($ticket->isFeature() ? $statusOptions['feature'] : $statusOptions['all']);
-                        @endphp
-                        <tr
-                            @class(['group transition duration-150 ease-out hover:bg-indigo-50/40', 'bg-rose-50/40' => $isOverdue, 'bg-slate-50' => $ticket->isBlocked(), 'ring-1 ring-inset ring-rose-100' => $ticket->urgency === 'critical'])
-                            x-data="ticketRow({
-                                endpoint: @js(route('tickets.inline-update', $ticket)),
-                                values: @js([
-                                    'title' => $ticket->title,
-                                    'urgency' => $ticket->urgency,
-                                    'assigned_to' => $ticket->assigned_to ? (string) $ticket->assigned_to : '',
-                                    'start_date' => $ticket->start_date?->toDateString() ?? '',
-                                    'due_date' => $ticket->due_date?->toDateString() ?? '',
-                                    'status' => $ticket->status,
-                                ]),
-                                labels: @js([
-                                    'urgency' => $ticket->formattedUrgency(),
-                                    'assignee' => $ticket->assignee?->name ?? 'Unassigned',
-                                    'start_date' => $ticket->start_date?->format('M j, Y') ?? 'Not set',
-                                    'due_date' => $ticket->due_date?->format('M j, Y') ?? 'Not set',
-                                    'status' => $ticket->formattedStatus(),
-                                    'updated_at' => $ticket->updated_at?->format('M j, Y g:i A'),
-                                ]),
-                                meta: @js(['due_date_overdue' => $isOverdue, 'blocked' => $ticket->isBlocked()]),
-                            })"
-                        >
-                            <td x-show="isColumnVisible('ticket_no')" data-column-key="ticket_no" class="whitespace-nowrap px-4 py-4 align-top">
-                                <a href="{{ route('tickets.show', $ticket) }}" data-ticket-drawer-url="{{ route('tickets.drawer', $ticket) }}" class="font-black text-slate-950 transition hover:text-indigo-700">{{ $ticket->ticket_no }}</a>
-                            </td>
-                            <td x-show="isColumnVisible('title')" data-column-key="title" class="min-w-72 px-4 py-3 align-top">
-                                @if ($isKielUser)
-                                    <div class="relative" :class="stateClass('title')">
-                                        <input type="text" x-model="values.title" @blur="save('title')" @keydown.enter.prevent="$event.target.blur()" class="w-full rounded-xl border border-transparent bg-transparent px-2 py-1 font-bold text-slate-800 transition focus:border-indigo-200 focus:bg-white focus:ring-indigo-500">
-                                        <span x-show="states.title === 'saving'" class="absolute right-2 top-2 text-xs font-black text-indigo-600">Saving…</span>
-                                    </div>
-                                    <p x-show="errors.title" x-text="errors.title" class="mt-1 text-xs font-bold text-rose-600"></p>
-                                @else
-                                    <a href="{{ route('tickets.show', $ticket) }}" data-ticket-drawer-url="{{ route('tickets.drawer', $ticket) }}" class="font-bold text-slate-800 hover:text-indigo-700">{{ $ticket->title }}</a>
-                                @endif
-                            </td>
-                            <td x-show="isColumnVisible('type')" data-column-key="type" class="whitespace-nowrap px-4 py-4 align-top font-bold text-slate-600">{{ str($ticket->type ?? 'unclassified')->headline() }}</td>
-                            <td x-show="isColumnVisible('urgency')" data-column-key="urgency" class="whitespace-nowrap px-4 py-3 align-top">
-                                @if ($isKielUser)
-                                    <select x-model="values.urgency" @change="save('urgency')" :class="badgeClass('urgency')" class="rounded-full border-0 px-3 py-1 text-xs font-black uppercase tracking-wide ring-1 ring-inset focus:ring-2 focus:ring-indigo-500">
-                                        <template x-for="option in window.ticketListConfig.urgencyOptions" :key="option.value"><option :value="option.value" x-text="option.label"></option></template>
-                                    </select>
-                                    <span x-show="states.urgency === 'saving'" class="ml-2 text-xs font-black text-indigo-600">Saving…</span>
-                                @else
-                                    <span @class(['badge', 'badge-urgency-critical' => $ticket->urgency === 'critical', 'badge-urgency-high' => $ticket->urgency === 'high', 'badge-urgency-medium' => $ticket->urgency === 'medium', 'badge-urgency-low' => $ticket->urgency === 'low'])>{{ $ticket->formattedUrgency() }}</span>
-                                @endif
-                            </td>
-                            <td x-show="isColumnVisible('status')" data-column-key="status" class="whitespace-nowrap px-4 py-3 align-top">
-                                @if ($isKielUser)
-                                    <select x-model="values.status" @change="save('status')" :class="badgeClass('status')" class="max-w-48 rounded-full border-0 px-3 py-1 text-xs font-black uppercase tracking-wide ring-1 ring-inset focus:ring-2 focus:ring-indigo-500">
-                                        @foreach ($rowStatusOptions as $option)
-                                            <option value="{{ $option['value'] }}">{{ $option['label'] }}</option>
-                                        @endforeach
-                                    </select>
-                                    <span x-show="states.status === 'saving'" class="ml-2 text-xs font-black text-indigo-600">Saving…</span>
-                                @else
-                                    <span @class(['badge', 'badge-blocked' => $ticket->isBlocked(), 'bg-emerald-100 text-emerald-700 ring-emerald-200' => in_array($ticket->status, [\App\Models\Ticket::STATUS_BUG_COMPLETED, \App\Models\Ticket::STATUS_FEATURE_COMPLETED], true), 'bg-indigo-100 text-indigo-700 ring-indigo-200' => $ticket->status === \App\Models\Ticket::STATUS_IN_PROGRESS, 'badge-status' => ! $ticket->isBlocked()])>{{ $ticket->formattedStatus() }}</span>
-                                @endif
-                            </td>
-                            <td x-show="isColumnVisible('assigned_to')" data-column-key="assigned_to" class="whitespace-nowrap px-4 py-3 align-top">
-                                @if ($isKielUser)
-                                    <select x-model="values.assigned_to" @change="save('assigned_to')" class="rounded-xl border-slate-200 bg-white text-sm font-bold text-slate-700 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" :class="stateClass('assigned_to')">
-                                        <option value="">Unassigned</option>
-                                        <template x-for="member in window.ticketListConfig.teamMembers" :key="member.value"><option :value="member.value" x-text="member.label"></option></template>
-                                    </select>
-                                    <span x-show="states.assigned_to === 'saving'" class="ml-2 text-xs font-black text-indigo-600">Saving…</span>
-                                @else
-                                    <span class="font-bold text-slate-600">{{ $ticket->assignee?->name ?? 'Unassigned' }}</span>
-                                @endif
-                            </td>
-                            <td x-show="isColumnVisible('client')" data-column-key="client" class="whitespace-nowrap px-4 py-4 align-top font-bold text-slate-700">{{ $ticket->client->name }}</td>
-                            <td x-show="isColumnVisible('software')" data-column-key="software" class="whitespace-nowrap px-4 py-4 align-top text-slate-600">{{ $ticket->software->name }}</td>
-                            <td x-show="isColumnVisible('start_date')" data-column-key="start_date" class="whitespace-nowrap px-4 py-3 align-top">
-                                @if ($isKielUser)
-                                    <input type="date" x-model="values.start_date" @change="save('start_date')" class="rounded-xl border-slate-200 bg-white text-sm font-bold text-slate-700 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" :class="stateClass('start_date')">
-                                @else
-                                    <span class="text-slate-600">{{ $ticket->start_date?->format('M j, Y') ?? 'Not set' }}</span>
-                                @endif
-                            </td>
-                            <td x-show="isColumnVisible('due_date')" data-column-key="due_date" class="whitespace-nowrap px-4 py-3 align-top">
-                                @if ($isKielUser)
-                                    <input type="date" x-model="values.due_date" @change="save('due_date')" class="rounded-xl border-slate-200 bg-white text-sm font-bold shadow-sm focus:border-indigo-500 focus:ring-indigo-500" :class="[stateClass('due_date'), meta.due_date_overdue ? 'border-rose-300 bg-rose-50 text-rose-700' : 'text-slate-700']">
-                                @else
-                                    <span @class(['font-bold' => $isOverdue, 'text-rose-700' => $isOverdue, 'text-slate-600' => ! $isOverdue])>{{ $ticket->due_date?->format('M j, Y') ?? 'Not set' }}</span>
-                                @endif
-                                <span x-show="meta.due_date_overdue" class="badge badge-overdue ml-2">Overdue</span>
-                            </td>
-                            <td x-show="isColumnVisible('sprint')" data-column-key="sprint" class="whitespace-nowrap px-4 py-4 align-top text-slate-600">{{ $latestSprint ? '#'.$latestSprint->sprint_no.' '.$latestSprint->name : 'No sprint' }}</td>
-                            <td x-show="isColumnVisible('blocked')" data-column-key="blocked" class="whitespace-nowrap px-4 py-4 align-top">
-                                <span x-show="meta.blocked" class="badge badge-blocked">Blocked</span>
-                                <span x-show="! meta.blocked" class="badge bg-emerald-50 text-emerald-700 ring-emerald-200">Clear</span>
-                            </td>
-                            <td x-show="isColumnVisible('updated_at')" data-column-key="updated_at" class="whitespace-nowrap px-4 py-4 align-top text-slate-500" x-text="labels.updated_at"></td>
-                        </tr>
-                    @endforeach
-                </tbody>
-            </table>
-        </div>
-        <div class="shrink-0 border-t border-slate-200 px-6 py-4">{{ $tickets->links() }}</div>
-        </div>
-    @else
-        <div class="flex h-full items-center justify-center p-12 text-center">
-            <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-indigo-50 text-2xl">🎫</div>
-            <h3 class="mt-5 text-xl font-black text-slate-950">No tickets found</h3>
-            <p class="mt-2 text-slate-500">Adjust the search or filters to find matching tickets.</p>
-        </div>
-    @endif
+<section class="asana-panel h-full min-h-0 overflow-hidden p-0" x-data="ticketList({ canInlineEdit: @js($isKielUser) })" data-list-board>
+<div class="tasks-scroll-area scrollbar-fade-mask flex-1 min-h-0 overflow-auto sleek-scrollbar p-3 space-y-3">
+@foreach (($listSections ?? \App\Models\Ticket::listSections()) as $sectionKey => $sectionLabel)
+@php($sectionTickets = $groupedTickets->get($sectionKey, collect()))
+<div class="rounded-xl border border-slate-200 bg-white" data-list-section data-section="{{ $sectionKey }}">
+<button type="button" class="w-full flex items-center justify-between px-4 py-2 text-left bg-slate-50" @click="$el.nextElementSibling.classList.toggle('hidden')">
+<span class="font-bold text-slate-800">{{ $sectionLabel }}</span>
+<span class="text-xs font-black text-slate-500" data-list-section-count>{{ $sectionTickets->count() }}</span>
+</button>
+<div data-list-dropzone data-section="{{ $sectionKey }}" class="overflow-auto">
+<table class="min-w-[1600px] table-fixed divide-y divide-slate-200 text-sm w-full">
+<thead class="bg-slate-50 text-left text-xs font-black uppercase tracking-widest text-slate-500"><tr>
+<th class="px-2 py-2"></th><th class="px-4 py-2">Ticket #</th><th class="px-4 py-2">Title</th><th class="px-4 py-2">Status</th><th class="px-4 py-2">Assignee</th>
+</tr></thead>
+<tbody data-list-section-body data-section="{{ $sectionKey }}">
+@foreach($sectionTickets as $ticket)
+<tr data-list-task-row data-ticket-id="{{ $ticket->id }}" data-ticket-type="{{ $ticket->type }}" data-current-section="{{ $ticket->listSectionKey() }}" data-current-status="{{ $ticket->status }}" data-move-url="{{ route('tickets.inline-update', $ticket) }}" class="border-t">
+<td class="px-2 py-2"><button type="button" data-list-drag-handle title="Drag to change status" class="cursor-grab text-slate-400">⋮⋮</button></td>
+<td class="px-4 py-2 font-bold"><a data-ticket-drawer-url="{{ route('tickets.drawer', $ticket) }}" href="{{ route('tickets.show', $ticket) }}">{{ $ticket->ticket_no }}</a></td>
+<td class="px-4 py-2">{{ $ticket->title }}</td>
+<td class="px-4 py-2"><span class="badge badge-status" data-list-status-label>{{ $ticket->formattedStatus() }}</span></td>
+<td class="px-4 py-2">{{ $ticket->assignee?->name ?? 'Unassigned' }}</td>
+</tr>
+@endforeach
+</tbody></table>
+<div class="px-4 py-3 text-xs text-slate-400" data-list-empty @if($sectionTickets->count()) hidden @endif>Drop tasks here</div>
+</div></div>
+@endforeach
+</div>
+<div class="shrink-0 border-t border-slate-200 px-6 py-4">{{ $tickets->links() }}</div>
 </section>
-
-<script>
-    window.ticketList = function (config) {
-        window.ticketListConfig = config;
-        return { ...config, columns: (window.Kiel.taskColumnsConfig || []), isColumnVisible(key){ return this.$store.taskColumns.isVisible(key); }, columnWidth(key){ return this.$store.taskColumns.width(key); }, startResize(event,key){ this.$store.taskColumns.startResize(event,key); } };
-    };
-
-    window.ticketRow = function (config) {
-        return {
-            endpoint: config.endpoint,
-            values: config.values,
-            original: { ...config.values },
-            labels: config.labels,
-            meta: config.meta,
-            states: {},
-            errors: {},
-            async save(field) {
-                if (this.values[field] === this.original[field]) {
-                    return;
-                }
-
-                const attemptedValue = this.values[field];
-                this.states[field] = 'saving';
-                this.errors[field] = '';
-
-                try {
-                    const payload = await window.Kiel.request(this.endpoint, {
-                        method: 'PATCH',
-                        body: JSON.stringify({ field, value: attemptedValue }),
-                    });
-
-                    this.applyPayload(payload.ticket);
-                    this.states[field] = 'success';
-                    setTimeout(() => {
-                        if (this.states[field] === 'success') {
-                            this.states[field] = '';
-                        }
-                    }, 1400);
-                    window.Kiel?.toast(payload.message || 'Ticket updated.');
-                } catch (error) {
-                    this.values[field] = this.original[field];
-                    this.errors[field] = error?.payload?.errors?.[field]?.[0] || error?.message || 'Unable to save this field.';
-                    this.states[field] = 'error';
-                    window.Kiel?.toast(this.errors[field], 'error');
-                }
-            },
-            applyPayload(ticket) {
-                this.values.title = ticket.title;
-                this.values.urgency = ticket.urgency;
-                this.values.assigned_to = ticket.assigned_to ? String(ticket.assigned_to) : '';
-                this.values.start_date = ticket.start_date || '';
-                this.values.due_date = ticket.due_date || '';
-                this.values.status = ticket.status;
-                this.original = { ...this.values };
-                this.labels.urgency = ticket.urgency_label;
-                this.labels.assignee = ticket.assignee_name;
-                this.labels.start_date = ticket.start_date_label;
-                this.labels.due_date = ticket.due_date_label;
-                this.labels.status = ticket.status_label;
-                this.labels.updated_at = ticket.updated_at;
-                this.meta.due_date_overdue = ticket.due_date_overdue;
-                this.meta.blocked = ticket.blocked;
-            },
-            stateClass(field) {
-                return {
-                    'ring-2 ring-indigo-200': this.states[field] === 'saving',
-                    'ring-2 ring-emerald-300 bg-emerald-50': this.states[field] === 'success',
-                    'ring-2 ring-rose-300 bg-rose-50': this.states[field] === 'error',
-                };
-            },
-            badgeClass(field) {
-                const value = this.values[field];
-                const palette = field === 'urgency'
-                    ? {
-                        critical: 'bg-rose-100 text-rose-700 ring-rose-200',
-                        high: 'bg-orange-100 text-orange-700 ring-orange-200',
-                        medium: 'bg-amber-100 text-amber-700 ring-amber-200',
-                        low: 'bg-emerald-100 text-emerald-700 ring-emerald-200',
-                    }
-                    : {
-                        bug_blocked: 'bg-rose-100 text-rose-700 ring-rose-200',
-                        feature_blocked: 'bg-rose-100 text-rose-700 ring-rose-200',
-                        bug_completed: 'bg-emerald-100 text-emerald-700 ring-emerald-200',
-                        feature_completed: 'bg-emerald-100 text-emerald-700 ring-emerald-200',
-                        in_progress: 'bg-indigo-100 text-indigo-700 ring-indigo-200',
-                        rejected: 'bg-slate-200 text-slate-700 ring-slate-300',
-                    };
-
-                return palette[value] || 'bg-slate-100 text-slate-700 ring-slate-200';
-            },
-        };
-    };
-</script>

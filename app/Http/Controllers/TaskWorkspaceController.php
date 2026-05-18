@@ -40,7 +40,7 @@ class TaskWorkspaceController extends Controller
         return response()->json([
             'html' => view($partial, $partial === 'tasks.partials.kanban-view'
                 ? ['activeView' => 'all', 'columns' => $data['kanbanColumns'], 'ticketsByColumn' => $data['kanbanTicketsByColumn'], 'canMove' => $data['canMove']]
-                : ['tickets' => $data['tickets'], 'sort' => $data['sort'], 'direction' => $data['direction'], 'teamMembers' => $data['teamMembers'], 'isKielUser' => $data['isKielUser']]
+: ['tickets' => $data['tickets'], 'sort' => $data['sort'], 'direction' => $data['direction'], 'teamMembers' => $data['teamMembers'], 'isKielUser' => $data['isKielUser'], 'listSections' => $data['listSections']]
             )->render(),
         ]);
     }
@@ -98,7 +98,7 @@ class TaskWorkspaceController extends Controller
             'softwares' => Software::query()->when(! $request->user()->isKielUser(), fn ($q) => $q->where('client_id', $request->user()->client_id))->orderBy('name')->get(['id', 'name']),
             'filters' => $filters, 'sort' => $sort, 'direction' => $direction, 'canEditTimeline' => $this->timelineService->canEdit($request->user()),
             'assignees' => User::query()->orderBy('name')->get(['id', 'name']), 'urgencies' => Ticket::URGENCIES, 'statuses' => array_values(array_filter(Ticket::STATUSES, fn ($status) => $status !== Ticket::STATUS_FEATURE_APPROVED && $status !== Ticket::STATUS_RECOMMENDED && $status !== Ticket::STATUS_NEXT_SPRINT)),
-            'sprints' => Sprint::query()->latest('id')->get(['id', 'name', 'sprint_no']), 'kanbanColumns' => $this->kanbanService->columnsFor(KanbanService::VIEW_ALL),
+            'sprints' => Sprint::query()->latest('id')->get(['id', 'name', 'sprint_no']), 'listSections' => Ticket::listSections(), 'kanbanColumns' => $this->kanbanService->columnsFor(KanbanService::VIEW_ALL),
             'kanbanTicketsByColumn' => $this->kanbanService->groupedTickets($request->user(), KanbanService::VIEW_ALL), 'canMove' => $request->user()->isKielUser() || $request->user()->isClientUser(), 'currentSprint' => $currentSprint, 'activeSprints' => $activeSprints, 'currentSprintStats' => $currentSprintStats,
         ];
     }
