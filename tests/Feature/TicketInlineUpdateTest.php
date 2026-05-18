@@ -148,7 +148,8 @@ class TicketInlineUpdateTest extends TestCase
             ->assertOk()
             ->assertJsonPath('removed_from_tasks', true)
             ->assertJsonPath('feature.id', $feature->id)
-            ->assertJsonPath('feature.status', Ticket::STATUS_NEXT_SPRINT);
+            ->assertJsonPath('feature.status', Ticket::STATUS_NEXT_SPRINT)
+            ->assertJsonPath('feature_status', Ticket::STATUS_NEXT_SPRINT);
 
         $task->refresh();
         $feature->refresh();
@@ -156,6 +157,8 @@ class TicketInlineUpdateTest extends TestCase
         $this->assertNotNull($task->archived_at);
         $this->assertSame(Ticket::STATUS_BACKLOG, $task->status);
         $this->assertSame(Ticket::STATUS_NEXT_SPRINT, $feature->status);
+        $this->assertNotNull($feature->returned_to_sprint_at);
+        $this->assertSame($task->id, $feature->returned_from_task_id);
         $this->assertEmpty($task->sprints()->pluck('sprints.id')->all());
         $this->assertFalse(Ticket::query()->notArchived()->whereKey($task->id)->exists());
         $response->assertJsonPath('feature_drawer_url', route('tickets.drawer', $feature));
@@ -178,6 +181,7 @@ class TicketInlineUpdateTest extends TestCase
         $task->refresh();
         $this->assertSame(Ticket::TYPE_FEATURE, $task->type);
         $this->assertSame(Ticket::STATUS_NEXT_SPRINT, $task->status);
+        $this->assertNotNull($task->returned_to_sprint_at);
         $this->assertFalse(Ticket::query()->whereIn('type', [Ticket::TYPE_TASK, Ticket::TYPE_BUG])->whereKey($task->id)->exists());
     }
 

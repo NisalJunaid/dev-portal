@@ -37,8 +37,8 @@ class SprintWorkflowTest extends TestCase
         $this->assertSame(Sprint::STATUS_IN_PROGRESS, $sprint->status);
         $this->assertNotNull($sprint->started_at);
         $this->assertSame($manager->id, $sprint->started_by);
-        $this->assertSame(Ticket::STATUS_NEXT_SPRINT, $firstFeature->refresh()->status);
-        $this->assertSame(Ticket::STATUS_NEXT_SPRINT, $secondFeature->refresh()->status);
+        $this->assertSame(Ticket::STATUS_FEATURE_IN_SPRINT, $firstFeature->refresh()->status);
+        $this->assertSame(Ticket::STATUS_FEATURE_IN_SPRINT, $secondFeature->refresh()->status);
         $this->assertSame(Ticket::STATUS_RECOMMENDED, $recommendedFeature->refresh()->status);
         $generatedTasks = Ticket::where('is_generated_task', true)->where('generated_from_sprint_id', $sprint->id)->get();
         $this->assertCount(2, $generatedTasks);

@@ -77,7 +77,10 @@ class SprintController extends Controller
 
         $approvedFeatures = (clone $featureQuery)
             ->where('status', Ticket::STATUS_NEXT_SPRINT)
-            ->whereDoesntHave('generatedTasks', fn ($q) => $q->whereHas('generatedFromSprint', fn ($s) => $s->where('status', Sprint::STATUS_COMPLETED)))
+            ->whereDoesntHave('generatedTasks', function ($q) {
+                $q->whereNull('archived_at')
+                    ->whereHas('generatedFromSprint', fn ($s) => $s->where('status', Sprint::STATUS_IN_PROGRESS));
+            })
             ->latest('updated_at')
             ->get();
         $futureFeatures = (clone $featureQuery)
@@ -203,6 +206,7 @@ class SprintController extends Controller
             $position = 1;
             foreach ($featureTickets as $ticket) {
                 $generatedTask = Ticket::create(['client_id' => $ticket->client_id,'software_id' => $ticket->software_id,'submitted_by' => $request->user()->id,'assigned_to' => $ticket->assigned_to,'ticket_no' => app(\App\Services\TicketNumberService::class)->next(),'title' => $ticket->title,'description' => $ticket->description,'urgency' => $ticket->urgency,'type' => Ticket::TYPE_TASK,'status' => Ticket::STATUS_BACKLOG,'submitted_at' => now(),'start_date' => $ticket->start_date,'due_date' => $ticket->due_date,'estimated_hours' => $ticket->estimated_hours,'source_feature_id' => $ticket->id,'generated_from_sprint_id' => $sprint->id,'is_generated_task' => true]);
+                $ticket->update(['status' => Ticket::STATUS_FEATURE_IN_SPRINT]);
                 $sprint->items()->create(['ticket_id' => $generatedTask->id, 'position' => $position++]);
                 $this->ticketActivityService->log($generatedTask, 'created from feature for sprint', 'Implementation task generated for '.$sprint->name.'.', $request->user());
             }

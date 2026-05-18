@@ -20,6 +20,7 @@ class Ticket extends Model
     public const STATUS_FEATURE_APPROVED = 'feature_approved';
     public const STATUS_RECOMMENDED = 'recommended';
     public const STATUS_NEXT_SPRINT = 'next_sprint';
+    public const STATUS_FEATURE_IN_SPRINT = 'feature_in_sprint';
     public const STATUS_IN_PROGRESS = 'in_progress';
     public const STATUS_TASK_BLOCKED = 'task_blocked';
     public const STATUS_TASK_COMPLETED = 'task_completed';
@@ -34,7 +35,7 @@ class Ticket extends Model
     public const URGENCIES = ['critical', 'high', 'medium', 'low'];
     public const TYPES = [self::TYPE_BUG, self::TYPE_FEATURE, self::TYPE_TASK];
     public const BUG_STATUSES = [self::STATUS_BUG_PENDING, self::STATUS_BUG_BLOCKED, self::STATUS_BUG_COMPLETED];
-    public const FEATURE_STATUSES = [self::STATUS_FEATURE_APPROVED, self::STATUS_RECOMMENDED, self::STATUS_NEXT_SPRINT, self::STATUS_IN_PROGRESS, self::STATUS_FEATURE_BLOCKED, self::STATUS_FEATURE_COMPLETED];
+    public const FEATURE_STATUSES = [self::STATUS_FEATURE_APPROVED, self::STATUS_RECOMMENDED, self::STATUS_NEXT_SPRINT, self::STATUS_FEATURE_IN_SPRINT, self::STATUS_IN_PROGRESS, self::STATUS_FEATURE_BLOCKED, self::STATUS_FEATURE_COMPLETED];
     public const TASK_STATUSES = [self::STATUS_BACKLOG, self::STATUS_IN_PROGRESS, self::STATUS_TASK_BLOCKED, self::STATUS_TASK_COMPLETED];
 
     public const STATUSES = [
@@ -45,6 +46,7 @@ class Ticket extends Model
         self::STATUS_FEATURE_APPROVED,
         self::STATUS_RECOMMENDED,
         self::STATUS_NEXT_SPRINT,
+        self::STATUS_FEATURE_IN_SPRINT,
         self::STATUS_IN_PROGRESS,
         self::STATUS_TASK_BLOCKED,
         self::STATUS_TASK_COMPLETED,
@@ -81,6 +83,8 @@ class Ticket extends Model
         'generated_from_sprint_id',
         'archived_at',
         'archived_reason',
+        'returned_to_sprint_at',
+        'returned_from_task_id',
     ];
 
     protected $casts = [
@@ -93,6 +97,7 @@ class Ticket extends Model
         'actual_completed_at' => 'datetime',
         'is_generated_task' => 'boolean',
         'archived_at' => 'datetime',
+        'returned_to_sprint_at' => 'datetime',
     ];
 
     public function client(): BelongsTo
@@ -159,6 +164,11 @@ class Ticket extends Model
     public function generatedFromSprint(): BelongsTo
     {
         return $this->belongsTo(Sprint::class, 'generated_from_sprint_id');
+    }
+
+    public function returnedFromTask(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'returned_from_task_id');
     }
 
     public function comments(): HasMany
