@@ -829,3 +829,36 @@ Production hardening and deployment preparation.
 
 ### Next planned task
 Production hardening and deployment preparation.
+
+## Completed: Task drawer regression fix + strict parent/subtask behavior
+
+### Summary
+- Restored compact editable drawer Details grid (status, urgency, assignee, start/due dates) plus read-only client/software/sprint fields.
+- Restored Description inline editing and preserved Comments/Activity sections.
+- Rebuilt header action row so timer and timer controls are right-aligned inline with SVG-only icon buttons; block/unblock remains compact.
+- Restored Add subtask action for parent tasks and hid it for subtasks with explicit no-nesting hint.
+- Added Ticket model helpers for parent/subtask capability and task status ranking.
+- Enforced nested-subtask prevention in ticket creation flow and parent inheritance rules for client/software/type.
+- Added parent->subtask status propagation and child-state guardrail in inline status updates; response now returns `updated_child_tickets`.
+- Updated list sync logic to apply `updated_child_tickets` payload updates.
+- Added feature tests for drawer field restoration, nested-subtask prevention, status propagation, and child rollback rejection.
+
+### Files changed
+- `resources/views/tickets/partials/drawer-content.blade.php`
+- `app/Models/Ticket.php`
+- `app/Http/Controllers/TicketController.php`
+- `resources/js/app.js`
+- `tests/Feature/TaskDrawerAndSubtaskRulesTest.php`
+- `docs/IMPLEMENTATION_TRACKER.md`
+
+### Tests/checks run
+- `php artisan test`
+- `php artisan route:list`
+- `php artisan view:clear`
+- `php artisan optimize:clear`
+
+### Known issues
+- Full command execution still depends on local Composer vendor availability.
+
+### Next planned task
+Production hardening and deployment preparation.

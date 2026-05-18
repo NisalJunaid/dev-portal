@@ -138,7 +138,7 @@ class TicketController extends Controller
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:255'],
             'description' => ['required', 'string', 'max:10000'],
-            'software_id' => ['required', Rule::exists('softwares', 'id')->where('is_enabled', true)],
+            'software_id' => ['nullable', Rule::exists('softwares', 'id')->where('is_enabled', true)],
             'urgency' => ['required', Rule::in(Ticket::URGENCIES)],
             'type' => ['required', Rule::in([Ticket::TYPE_TASK, Ticket::TYPE_BUG])],
             'parent_ticket_id' => ['nullable', Rule::exists('tickets', 'id')],
@@ -148,29 +148,41 @@ class TicketController extends Controller
             'estimated_hours' => ['nullable', 'numeric', 'min:0', 'max:999999.99'],
         ]);
 
-        $software = Software::with('client')->findOrFail($validated['software_id']);
+        $parentTicket = null;
+        if (! empty($validated['parent_ticket_id'])) {
+            $parentTicket = Ticket::query()->visibleTo($request->user())->findOrFail($validated['parent_ticket_id']);
+            if (! $parentTicket->isTask() || $parentTicket->parent_ticket_id !== null) {
+                throw ValidationException::withMessages([
+                    'parent_ticket_id' => 'Subtasks cannot have nested subtasks.',
+                ]);
+            }
+        }
+
+        $software = $parentTicket
+            ? Software::with('client')->findOrFail($parentTicket->software_id)
+            : Software::with('client')->findOrFail($validated['software_id']);
         abort_unless($request->user()->canAccessClient($software->client), 403);
 
-        $type = $validated['type'];
+        $type = $parentTicket ? Ticket::TYPE_TASK : $validated['type'];
         $isTask = $type === Ticket::TYPE_TASK;
         $isBug = $type === Ticket::TYPE_BUG;
         if ($isTask || $isBug) {
             abort_unless($request->user()->isKielUser(), 403);
         }
 
-        [$ticket, $activeSprint] = DB::transaction(function () use ($request, $validated, $software, $isTask, $isBug, $type) {
+        [$ticket, $activeSprint] = DB::transaction(function () use ($request, $validated, $software, $isTask, $isBug, $type, $parentTicket) {
             $ticket = Ticket::create([
-                'client_id' => $software->client_id,
-                'software_id' => $software->id,
+                'client_id' => $parentTicket?->client_id ?? $software->client_id,
+                'software_id' => $parentTicket?->software_id ?? $software->id,
                 'submitted_by' => $request->user()->id,
                 'ticket_no' => $this->ticketNumberService->next(),
                 'title' => $validated['title'],
                 'description' => $validated['description'],
-                'urgency' => $validated['urgency'],
+                'urgency' => $validated['urgency'] ?? ($parentTicket?->urgency ?? 'medium'),
                 'type' => $type,
                 'status' => $isBug ? Ticket::STATUS_BUG_PENDING : Ticket::STATUS_BACKLOG,
                 'submitted_at' => now(),
-                'parent_ticket_id' => $validated['parent_ticket_id'] ?? null,
+                'parent_ticket_id' => $parentTicket?->id,
                 'assigned_to' => $isTask ? ($validated['assigned_to'] ?? null) : null,
                 'start_date' => $isTask ? ($validated['start_date'] ?? null) : null,
                 'due_date' => $isTask ? ($validated['due_date'] ?? null) : null,
@@ -349,7 +361,7 @@ class TicketController extends Controller
         $this->authorizeKielTicketAccess($request, $ticket);
 
         $validated = $request->validate([
-            'software_id' => ['required', Rule::exists('softwares', 'id')->where('is_enabled', true)],
+            'software_id' => ['nullable', Rule::exists('softwares', 'id')->where('is_enabled', true)],
             'urgency' => ['required', Rule::in(Ticket::URGENCIES)],
             'assigned_to' => ['nullable', Rule::exists('users', 'id')],
             'status' => ['required', Rule::in(Ticket::STATUSES)],
@@ -368,9 +380,9 @@ class TicketController extends Controller
         }
 
         $updates = [
-            'client_id' => $software->client_id,
-            'software_id' => $software->id,
-            'urgency' => $validated['urgency'],
+            'client_id' => $parentTicket?->client_id ?? $software->client_id,
+            'software_id' => $parentTicket?->software_id ?? $software->id,
+            'urgency' => $validated['urgency'] ?? ($parentTicket?->urgency ?? 'medium'),
             'assigned_to' => $validated['assigned_to'] ?? null,
             'status' => $validated['status'],
             'start_date' => $validated['start_date'] ?? null,
@@ -468,8 +480,19 @@ class TicketController extends Controller
             return $this->moveTaskToNextSprintFeature($request, $ticket);
         }
 
-        DB::transaction(function () use ($ticket, $field, $normalizedValue, $oldValue, $request) {
+        $updatedChildren = collect();
+
+        DB::transaction(function () use ($ticket, $field, $normalizedValue, $oldValue, $request, &$updatedChildren) {
             $updates = [$field => $normalizedValue];
+
+            if ($field === 'status' && $ticket->isSubtask()) {
+                $parent = $ticket->parent()->first();
+                if ($parent && Ticket::taskStatusRank($normalizedValue) < Ticket::taskStatusRank($parent->status)) {
+                    throw ValidationException::withMessages([
+                        'status' => 'Subtask cannot be moved behind its parent status.',
+                    ]);
+                }
+            }
 
             if ($field === 'status') {
                 if (in_array($normalizedValue, [Ticket::STATUS_BUG_COMPLETED, Ticket::STATUS_FEATURE_COMPLETED, Ticket::STATUS_TASK_COMPLETED], true)) {
@@ -494,6 +517,20 @@ class TicketController extends Controller
                     $ticket->{$field}
                 );
             }
+
+            if ($field === 'status' && $ticket->canHaveSubtasks()) {
+                $children = $ticket->subtasks()->get();
+                foreach ($children as $child) {
+                    $nextStatus = $normalizedValue;
+                    if ($normalizedValue === Ticket::STATUS_TASK_COMPLETED && $child->status === Ticket::STATUS_REJECTED) {
+                        continue;
+                    }
+                    if ($normalizedValue === Ticket::STATUS_BACKLOG || $normalizedValue === Ticket::STATUS_IN_PROGRESS || $normalizedValue === Ticket::STATUS_TASK_BLOCKED || $normalizedValue === Ticket::STATUS_TASK_COMPLETED || $normalizedValue === Ticket::STATUS_REJECTED) {
+                        $child->update(['status' => $nextStatus]);
+                        $updatedChildren->push($child->fresh()->load(['client','software','assignee','sprints']));
+                    }
+                }
+            }
         });
 
         $ticket->refresh()->load(['client', 'software', 'assignee', 'sprints']);
@@ -501,6 +538,7 @@ class TicketController extends Controller
         return response()->json([
             'message' => 'Ticket updated.',
             'ticket' => $this->inlineTicketPayload($ticket),
+            'updated_child_tickets' => $updatedChildren->map(fn (Ticket $child) => $this->inlineTicketPayload($child))->values()->all(),
         ]);
     }
 

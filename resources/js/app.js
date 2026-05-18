@@ -434,6 +434,12 @@ window.KielTaskList = {
             ticketNo.textContent = ticket.ticket_no;
         }
     },
+    getChildRows(parentRow) {
+        const parentId = parentRow?.dataset?.ticketId;
+        const board = parentRow?.closest?.("[data-list-board]");
+        if (!parentId || !board) return [];
+        return Array.from(board.querySelectorAll(`[data-list-task-row][data-parent-ticket-id="${parentId}"]`));
+    },
     moveRowToSection(row, sectionKey, index = null) {
         const board = row?.closest('[data-list-board]') || document.querySelector('[data-list-board]');
         const targetBody = board?.querySelector(`[data-list-section-body][data-section="${sectionKey}"]`);
@@ -529,6 +535,7 @@ window.KielTaskList = {
 
                         this.moveRowToSection(row, newSection, null);
                         this.updateListRowFromPayload(row, payload.ticket);
+                        (payload.updated_child_tickets || []).forEach((child) => this.applyTicketUpdate(child));
                         this.updateCounts();
 
                         window.KielTasks.emitTaskUpdated(payload.ticket);
@@ -556,6 +563,7 @@ window.addEventListener('kiel:task-updated', (event) => {
         window.KielTaskList.updateListRowFromPayload(row, ticket);
     });
     window.KielTaskList.updateCounts();
+    (event.detail?.updated_child_tickets || []).forEach((child) => window.KielTaskList.applyTicketUpdate(child));
     window.KielKanban?.applyTicketUpdate?.(ticket);
     window.KielTasks.markDirty('timeline');
 });
