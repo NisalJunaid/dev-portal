@@ -442,12 +442,21 @@ window.KielTaskList = {
 
         targetBody.querySelector('[data-list-empty-row]')?.remove();
 
-        const taskRows = Array.from(targetBody.querySelectorAll('[data-list-task-row]'));
-
-        if (index === null || index >= taskRows.length) {
-            targetBody.appendChild(row);
+        const parentId = row.dataset.parentTicketId;
+        if (parentId) {
+            const parentRow = targetBody.querySelector(`[data-list-task-row][data-ticket-id="${parentId}"]`);
+            if (parentRow) {
+                let anchor = parentRow;
+                const siblings = Array.from(targetBody.querySelectorAll(`[data-list-task-row][data-parent-ticket-id="${parentId}"]`));
+                if (siblings.length) anchor = siblings[siblings.length - 1];
+                anchor.insertAdjacentElement('afterend', row);
+            } else {
+                targetBody.appendChild(row);
+            }
         } else {
-            targetBody.insertBefore(row, taskRows[index] || null);
+            const taskRows = Array.from(targetBody.querySelectorAll('[data-list-task-row]'));
+            if (index === null || index >= taskRows.length) targetBody.appendChild(row);
+            else targetBody.insertBefore(row, taskRows[index] || null);
         }
 
         row.dataset.currentSection = sectionKey;
@@ -559,3 +568,25 @@ window.addEventListener('kiel:task-removed', (event) => {
 });
 
 
+
+
+window.KielDrawerTimers = {
+    intervals: new Map(),
+    format(seconds) { const sec = Math.max(0, Number(seconds || 0)); const h = String(Math.floor(sec / 3600)).padStart(2, '0'); const m = String(Math.floor((sec % 3600) / 60)).padStart(2, '0'); const s = String(sec % 60).padStart(2, '0'); return `${h}:${m}:${s}`; },
+    init(root = document) {
+        root.querySelectorAll?.('[data-ticket-timer]').forEach((el) => {
+            const id = el.closest('[data-ticket-drawer-content]')?.dataset.ticketId || 'global';
+            if (this.intervals.has(id)) { clearInterval(this.intervals.get(id)); this.intervals.delete(id); }
+            let elapsed = Number(el.dataset.elapsed || 0);
+            const status = el.dataset.status || 'idle';
+            const display = el.querySelector('[data-ticket-timer-display]');
+            if (display) display.textContent = this.format(elapsed);
+            if (status === 'running' && display) {
+                const int = setInterval(() => { elapsed += 1; display.textContent = this.format(elapsed); }, 1000);
+                this.intervals.set(id, int);
+            }
+        });
+    }
+};
+
+document.addEventListener('kiel:drawer-loaded', () => window.KielDrawerTimers.init());

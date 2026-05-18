@@ -64,6 +64,8 @@
                     if (body) {
                         body.innerHTML = payload.html;
                         body.querySelectorAll('[data-inline-field]').forEach(element => { element.dataset.originalValue = fieldValue(element); });
+                        window.KielDrawerTimers?.init(body);
+                        document.dispatchEvent(new CustomEvent('kiel:drawer-loaded')); 
                     }
                 } catch (error) {
                     if (body) body.innerHTML = `<div class="p-6"><div class="rounded-2xl border border-rose-200 bg-rose-50 p-5 text-sm font-bold text-rose-800">${error.message || 'Task drawer could not load.'}</div></div>`;
