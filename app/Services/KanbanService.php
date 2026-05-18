@@ -74,6 +74,13 @@ class KanbanService
             }),
         };
 
+        $workType = $filters['work_type'] ?? null;
+        if ($workType === 'bugs') {
+            $query->where('type', Ticket::TYPE_BUG);
+        } elseif ($workType === 'tasks') {
+            $query->where('type', Ticket::TYPE_TASK);
+        }
+
         $scope = $filters['scope'] ?? 'current_sprint';
         $sprintId = $filters['sprint_id'] ?? null;
         $currentSprintIds = $filters['current_sprint_ids'] ?? [];
@@ -98,6 +105,13 @@ class KanbanService
             ->latest('updated_at')
             ->get()
             ->groupBy(fn (Ticket $ticket) => $this->columnKeyForTicket($ticket, $view));
+    }
+
+    public function columnsForWorkType(string $workType): array
+    {
+        return $workType === 'bugs'
+            ? [Ticket::STATUS_BUG_PENDING => 'Pending', 'blocked' => 'Blocked', 'completed' => 'Completed', Ticket::STATUS_REJECTED => 'Rejected']
+            : [Ticket::STATUS_BACKLOG => 'Backlog', Ticket::STATUS_IN_PROGRESS => 'In Progress', 'blocked' => 'Blocked', 'completed' => 'Completed', Ticket::STATUS_REJECTED => 'Rejected', Ticket::STATUS_NEXT_SPRINT => 'Next Sprint'];
     }
 
     public function moveTicket(Ticket $ticket, User $user, string $column, int $position, string $view): array
