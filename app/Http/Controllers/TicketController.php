@@ -140,7 +140,7 @@ class TicketController extends Controller
             'description' => ['required', 'string', 'max:10000'],
             'software_id' => ['required', Rule::exists('softwares', 'id')->where('is_enabled', true)],
             'urgency' => ['required', Rule::in(Ticket::URGENCIES)],
-            'type' => ['nullable', Rule::in([Ticket::TYPE_TASK])],
+            'type' => ['required', Rule::in([Ticket::TYPE_TASK, Ticket::TYPE_BUG])],
             'parent_ticket_id' => ['nullable', Rule::exists('tickets', 'id')],
             'assigned_to' => ['nullable', Rule::exists('users', 'id')],
             'start_date' => ['nullable', 'date'],
@@ -151,12 +151,14 @@ class TicketController extends Controller
         $software = Software::with('client')->findOrFail($validated['software_id']);
         abort_unless($request->user()->canAccessClient($software->client), 403);
 
-        $isTask = ($validated['type'] ?? null) === Ticket::TYPE_TASK;
-        if ($isTask) {
+        $type = $validated['type'];
+        $isTask = $type === Ticket::TYPE_TASK;
+        $isBug = $type === Ticket::TYPE_BUG;
+        if ($isTask || $isBug) {
             abort_unless($request->user()->isKielUser(), 403);
         }
 
-        $ticket = DB::transaction(function () use ($request, $validated, $software, $isTask) {
+        [$ticket, $activeSprint] = DB::transaction(function () use ($request, $validated, $software, $isTask, $isBug, $type) {
             $ticket = Ticket::create([
                 'client_id' => $software->client_id,
                 'software_id' => $software->id,
@@ -165,8 +167,8 @@ class TicketController extends Controller
                 'title' => $validated['title'],
                 'description' => $validated['description'],
                 'urgency' => $validated['urgency'],
-                'type' => $isTask ? Ticket::TYPE_TASK : null,
-                'status' => Ticket::STATUS_BACKLOG,
+                'type' => $type,
+                'status' => $isBug ? Ticket::STATUS_BUG_PENDING : Ticket::STATUS_BACKLOG,
                 'submitted_at' => now(),
                 'parent_ticket_id' => $validated['parent_ticket_id'] ?? null,
                 'assigned_to' => $isTask ? ($validated['assigned_to'] ?? null) : null,
@@ -175,9 +177,21 @@ class TicketController extends Controller
                 'estimated_hours' => $isTask ? ($validated['estimated_hours'] ?? null) : null,
             ]);
 
-            $this->ticketActivityService->log($ticket, 'created', $isTask ? 'Task created.' : 'Ticket submitted to the centralized intake backlog.', $request->user());
+            $this->ticketActivityService->log($ticket, 'created', $isBug ? 'Bug created.' : 'Task created.', $request->user());
 
-            return $ticket;
+            $activeSprint = Sprint::query()
+                ->where('client_id', $software->client_id)
+                ->where('status', Sprint::STATUS_IN_PROGRESS)
+                ->latest('started_at')
+                ->first();
+
+            if ($activeSprint) {
+                $nextPosition = (int) $activeSprint->items()->max('position') + 1;
+                $activeSprint->items()->create(['ticket_id' => $ticket->id, 'position' => $nextPosition]);
+                $this->ticketActivityService->log($ticket, 'sprint linked', 'Added to current sprint.', $request->user());
+            }
+
+            return [$ticket, $activeSprint];
         });
 
         if ($request->expectsJson()) {
@@ -187,6 +201,9 @@ class TicketController extends Controller
                 'message' => $ticket->ticket_no.' created successfully.',
                 'ticket' => $this->inlineTicketPayload($ticket),
                 'drawer_url' => route('tickets.drawer', $ticket),
+                'work_type' => $ticket->type === Ticket::TYPE_BUG ? 'bugs' : 'tasks',
+                'attached_to_current_sprint' => $activeSprint !== null,
+                'sprint_id' => $activeSprint?->id,
             ], 201);
         }
 

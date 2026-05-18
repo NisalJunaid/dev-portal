@@ -676,3 +676,36 @@ Production hardening and deployment preparation.
 
 ### Next planned task
 Production hardening and deployment preparation.
+
+## Completed: Tasks/Bugs workspace switch + generic Add new flow
+
+### Summary
+- Added a centered Tasks/Bugs workspace switch state (`work_type`) on `/tasks` and defaulted it to `tasks`.
+- Updated workspace querying so List/Board are type-scoped (tasks only vs bugs only) and exclude feature requests.
+- Renamed toolbar CTA from `Create Task` to `Add new` and kept existing drawer open behavior.
+- Added Bug toggle in the create drawer (`is_bug`) with dynamic submit label and bug helper copy.
+- Extended ticket creation backend to accept/create both task and bug records, assign default lifecycle status, and auto-attach to the active sprint when available.
+- Extended JSON create response with `work_type`, `attached_to_current_sprint`, and `sprint_id` for no-reload UI sync.
+- Added work-type-aware Kanban column set and query filtering support.
+- Added Timeline filtering support for `work_type` so shared timeline can reflect current switch.
+
+### Files changed
+- `resources/views/tasks/index.blade.php`
+- `resources/views/tasks/partials/create-task-drawer.blade.php`
+- `app/Http/Controllers/TaskWorkspaceController.php`
+- `app/Http/Controllers/TicketController.php`
+- `app/Services/KanbanService.php`
+- `app/Services/TimelineService.php`
+- `docs/IMPLEMENTATION_TRACKER.md`
+
+### Tests/checks run
+- `php artisan route:list`
+- `php artisan view:clear`
+- `php artisan optimize:clear`
+- `php artisan test`
+
+### Known issues
+- Some advanced toolbar layout/style parity and work-type-specific status dropdown rendering may still need further polish.
+
+### Next planned task
+Production hardening and deployment preparation.

@@ -124,6 +124,8 @@ class TimelineService
                 $query->whereIn('type', [Ticket::TYPE_TASK, Ticket::TYPE_BUG])
                     ->orWhere('is_generated_task', true);
             })
+            ->when(($filters['work_type'] ?? null) === 'tasks', fn (Builder $query) => $query->where('type', Ticket::TYPE_TASK))
+            ->when(($filters['work_type'] ?? null) === 'bugs', fn (Builder $query) => $query->where('type', Ticket::TYPE_BUG))
             ->when(($filters['scope'] ?? 'current_sprint') === 'current_sprint', function (Builder $query) use ($filters) {
                 $ids = $filters['current_sprint_ids'] ?? [];
                 $query->whereHas('sprints', fn (Builder $sprintQuery) => $sprintQuery->whereIn('sprints.id', ! empty($ids) ? $ids : [0]));
