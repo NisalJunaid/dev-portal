@@ -50,7 +50,7 @@ class KanbanService
         };
     }
 
-    public function queryFor(User $user, string $view)
+    public function queryFor(User $user, string $view, array $filters = [])
     {
         $query = Ticket::query()->notArchived()->with(['client', 'software', 'assignee', 'sprints']);
 
@@ -58,7 +58,7 @@ class KanbanService
             $query->where('client_id', $user->client_id);
         }
 
-        return match ($view) {
+        $query = match ($view) {
             self::VIEW_BUGS => $query->where('type', Ticket::TYPE_BUG)->whereIn('status', Ticket::BUG_STATUSES),
             self::VIEW_FEATURES => $query->where('type', Ticket::TYPE_FEATURE)->whereIn('status', Ticket::FEATURE_STATUSES),
             self::VIEW_SPRINT => $query->where(function ($q) {
@@ -73,11 +73,26 @@ class KanbanService
                     ->orWhereNull('type');
             }),
         };
+
+        $scope = $filters['scope'] ?? 'current_sprint';
+        $sprintId = $filters['sprint_id'] ?? null;
+        $currentSprintIds = $filters['current_sprint_ids'] ?? [];
+        if ($scope === 'current_sprint') {
+            $query->whereHas('sprints', fn ($s) => $s->whereIn('sprints.id', ! empty($currentSprintIds) ? $currentSprintIds : [0]));
+        } elseif ($scope === 'unsprinted') {
+            $query->whereDoesntHave('sprints');
+        } elseif ($scope === 'completed_sprints') {
+            $query->whereHas('sprints', fn ($s) => $s->where('status', 'completed'));
+        } elseif ($scope === 'sprint' && $sprintId) {
+            $query->whereHas('sprints', fn ($s) => $s->where('sprints.id', $sprintId));
+        }
+
+        return $query;
     }
 
-    public function groupedTickets(User $user, string $view)
+    public function groupedTickets(User $user, string $view, array $filters = [])
     {
-        return $this->queryFor($user, $view)
+        return $this->queryFor($user, $view, $filters)
             ->orderByRaw('priority_order is null')
             ->orderBy('priority_order')
             ->latest('updated_at')

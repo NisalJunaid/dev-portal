@@ -16,6 +16,7 @@ use Illuminate\Validation\Rule;
 
 class TaskWorkspaceController extends Controller
 {
+    private const SCOPES = ['current_sprint', 'all', 'unsprinted', 'completed_sprints', 'sprint'];
     public function __construct(
         private readonly KanbanService $kanbanService,
         private readonly TimelineService $timelineService,
@@ -53,11 +54,26 @@ class TaskWorkspaceController extends Controller
             'client_id' => ['nullable', 'integer', Rule::exists('clients', 'id')], 'software_id' => ['nullable', 'integer', Rule::exists('softwares', 'id')],
             'blocked' => ['nullable', Rule::in(['yes', 'no'])], 'sort' => ['nullable', Rule::in(['ticket_no', 'title', 'type', 'urgency', 'status', 'assigned_to', 'client', 'software', 'start_date', 'due_date', 'sprint', 'blocked', 'updated_at'])],
             'direction' => ['nullable', Rule::in(['asc', 'desc'])], 'per_page' => ['nullable', 'integer', 'min:10', 'max:100'],
+            'scope' => ['nullable', Rule::in(self::SCOPES)],
+            'sprint_id' => ['nullable', 'integer', Rule::exists('sprints', 'id')],
         ]);
         $sort = $validated['sort'] ?? 'updated_at'; $direction = $validated['direction'] ?? 'desc';
+        $selectedScope = $validated['scope'] ?? 'current_sprint';
+        $selectedSprintId = $validated['sprint_id'] ?? null;
         $requestedView = $validated['view'] ?? 'list';
         $activeView = in_array($requestedView, ['list', 'board', 'timeline'], true) ? $requestedView : 'list';
         $filters = array_merge(['view' => $activeView], $validated);
+
+        $activeSprints = Sprint::query()->with('client')->where('status', Sprint::STATUS_IN_PROGRESS)
+            ->when(($validated['client_id'] ?? null) && $request->user()->isKielUser(), fn ($q, $cid) => $q->where('client_id', $cid))
+            ->when(! $request->user()->isKielUser(), fn ($q) => $q->where('client_id', $request->user()->client_id))
+            ->latest('started_at')->get();
+        $currentSprintIds = $activeSprints->pluck('id')->all();
+        $currentSprint = $activeSprints->first();
+
+        if ($selectedScope === 'sprint' && ! $selectedSprintId) {
+            $selectedScope = 'current_sprint';
+        }
 
         $tickets = Ticket::query()->visibleTo($request->user())->notArchived()->with(['client', 'software', 'submitter', 'assignee', 'sprints'])->withExists(['activeBlock as is_blocked'])
             ->when($validated['search'] ?? null, fn ($q, string $search) => $q->where(fn ($q) => $q->where('ticket_no', 'like', '%'.$search.'%')->orWhere('title', 'like', '%'.$search.'%')))
@@ -69,26 +85,24 @@ class TaskWorkspaceController extends Controller
             ->when(($validated['assigned_to'] ?? null) && ($validated['assigned_to'] ?? null) !== 'unassigned', fn ($q) => $q->where('assigned_to', $validated['assigned_to']))
             ->when(($validated['client_id'] ?? null) && $request->user()->isKielUser(), fn ($q, int $clientId) => $q->where('client_id', $clientId))
             ->when($validated['software_id'] ?? null, fn ($q, int $softwareId) => $q->where('software_id', $softwareId))
+            ->when($selectedScope === 'current_sprint', fn ($q) => $q->whereHas('sprints', fn ($s) => $s->whereIn('sprints.id', $currentSprintIds ?: [0])))
+            ->when($selectedScope === 'unsprinted', fn ($q) => $q->whereDoesntHave('sprints'))
+            ->when($selectedScope === 'completed_sprints', fn ($q) => $q->whereHas('sprints', fn ($s) => $s->where('status', Sprint::STATUS_COMPLETED)))
+            ->when($selectedScope === 'sprint' && $selectedSprintId, fn ($q) => $q->whereHas('sprints', fn ($s) => $s->where('sprints.id', $selectedSprintId)))
             ->orderBy('tickets.'.$sort, $direction)
             ->paginate($validated['per_page'] ?? 25)->withQueryString();
-
-
-        $currentSprint = Sprint::query()->with('client')->where('status', Sprint::STATUS_IN_PROGRESS)
-            ->when(($validated['client_id'] ?? null) && $request->user()->isKielUser(), fn ($q, $cid) => $q->where('client_id', $cid))
-            ->when(! $request->user()->isKielUser(), fn ($q) => $q->where('client_id', $request->user()->client_id))
-            ->latest('started_at')->first();
-
-        $activeSprints = collect();
-        if ($request->user()->isKielUser() && empty($validated['client_id'])) {
-            $activeSprints = Sprint::query()->with('client')->where('status', Sprint::STATUS_IN_PROGRESS)->latest('started_at')->get();
-        }
 
         $currentSprintStats = null;
         if ($currentSprint) {
             $currentSprint->load('tickets');
             $completed = $currentSprint->tickets->filter(fn (Ticket $ticket) => $ticket->isDone())->count();
             $total = $currentSprint->tickets->count();
-            $currentSprintStats = ['total_tasks' => $total, 'completed_tasks' => $completed, 'incomplete_tasks' => $total - $completed, 'started_at' => $currentSprint->started_at, 'elapsed_seconds' => $currentSprint->elapsedSeconds(), 'timer_status' => $currentSprint->timer_status];
+            $backlog = $currentSprint->tickets->where('status', Ticket::STATUS_BACKLOG)->count();
+            $inProgress = $currentSprint->tickets->where('status', Ticket::STATUS_IN_PROGRESS)->count();
+            $blocked = $currentSprint->tickets->filter(fn (Ticket $ticket) => $ticket->isBlocked())->count();
+            $rejected = $currentSprint->tickets->where('status', Ticket::STATUS_REJECTED)->count();
+            $remaining = $total - $completed - $rejected;
+            $currentSprintStats = ['total_tasks' => $total, 'completed_tasks' => $completed, 'incomplete_tasks' => $total - $completed, 'started_at' => $currentSprint->started_at, 'elapsed_seconds' => $currentSprint->elapsedSeconds(), 'timer_status' => $currentSprint->timer_status, 'backlog_tasks' => $backlog, 'in_progress_tasks' => $inProgress, 'blocked_tasks' => $blocked, 'rejected_tasks' => $rejected, 'remaining_tasks' => max(0, $remaining), 'can_end' => $currentSprint->canEnd()];
         }
 
         return [
@@ -96,10 +110,10 @@ class TaskWorkspaceController extends Controller
             'teamMembers' => User::role(['super_admin', 'kiel_manager', 'developer'])->orderBy('name')->get(['id', 'name']),
             'clients' => Client::query()->when(! $request->user()->isKielUser(), fn ($q) => $q->whereKey($request->user()->client_id))->orderBy('name')->get(['id', 'name']),
             'softwares' => Software::query()->when(! $request->user()->isKielUser(), fn ($q) => $q->where('client_id', $request->user()->client_id))->orderBy('name')->get(['id', 'name']),
-            'filters' => $filters, 'sort' => $sort, 'direction' => $direction, 'canEditTimeline' => $this->timelineService->canEdit($request->user()),
+            'filters' => array_merge($filters, ['scope' => $selectedScope, 'sprint_id' => $selectedSprintId]), 'sort' => $sort, 'direction' => $direction, 'canEditTimeline' => $this->timelineService->canEdit($request->user()),
             'assignees' => User::query()->orderBy('name')->get(['id', 'name']), 'urgencies' => Ticket::URGENCIES, 'statuses' => array_values(array_filter(Ticket::STATUSES, fn ($status) => $status !== Ticket::STATUS_FEATURE_APPROVED && $status !== Ticket::STATUS_RECOMMENDED && $status !== Ticket::STATUS_NEXT_SPRINT)),
             'sprints' => Sprint::query()->latest('id')->get(['id', 'name', 'sprint_no']), 'listSections' => Ticket::listSections(), 'kanbanColumns' => $this->kanbanService->columnsFor(KanbanService::VIEW_ALL),
-            'kanbanTicketsByColumn' => $this->kanbanService->groupedTickets($request->user(), KanbanService::VIEW_ALL), 'canMove' => $request->user()->isKielUser() || $request->user()->isClientUser(), 'currentSprint' => $currentSprint, 'activeSprints' => $activeSprints, 'currentSprintStats' => $currentSprintStats,
+            'kanbanTicketsByColumn' => $this->kanbanService->groupedTickets($request->user(), KanbanService::VIEW_ALL, ['scope' => $selectedScope, 'sprint_id' => $selectedSprintId, 'current_sprint_ids' => $currentSprintIds] + $validated), 'canMove' => $request->user()->isKielUser() || $request->user()->isClientUser(), 'currentSprint' => $currentSprint, 'activeSprints' => $activeSprints, 'currentSprintStats' => $currentSprintStats, 'currentSprintIds' => $currentSprintIds, 'selectedScope' => $selectedScope, 'selectedSprintId' => $selectedSprintId,
         ];
     }
 }

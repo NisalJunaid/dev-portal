@@ -91,19 +91,15 @@ const setLoading = (element, loading = true, label = 'Saving…') => {
 
 
 const taskColumnDefinitions = [
-    { key: 'ticket_no', label: 'Ticket #', min: 120, defaultWidth: 140, max: 600 },
+    { key: 'ticket_no', label: 'Ticket', min: 120, defaultWidth: 140, max: 600 },
     { key: 'title', label: 'Title', min: 260, defaultWidth: 320, max: 900 },
-    { key: 'type', label: 'Type', min: 120, defaultWidth: 130, max: 600 },
     { key: 'urgency', label: 'Urgency', min: 140, defaultWidth: 150, max: 600 },
     { key: 'status', label: 'Status', min: 160, defaultWidth: 180, max: 600 },
-    { key: 'assigned_to', label: 'Assigned to', min: 180, defaultWidth: 200, max: 600 },
-    { key: 'client', label: 'Client', min: 180, defaultWidth: 180, max: 600 },
+    { key: 'assigned_to', label: 'Assignee', min: 180, defaultWidth: 200, max: 600 },
     { key: 'software', label: 'Software', min: 180, defaultWidth: 180, max: 600 },
-    { key: 'start_date', label: 'Start date', min: 150, defaultWidth: 160, max: 600 },
+    { key: 'sprint', label: 'Sprint', min: 200, defaultWidth: 220, max: 700 },
     { key: 'due_date', label: 'Due date', min: 150, defaultWidth: 160, max: 600 },
-    { key: 'sprint', label: 'Sprint cycle', min: 200, defaultWidth: 220, max: 700 },
-    { key: 'blocked', label: 'Blocked', min: 120, defaultWidth: 130, max: 400 },
-    { key: 'updated_at', label: 'Last updated', min: 180, defaultWidth: 200, max: 700 },
+    { key: 'updated_at', label: 'Updated', min: 180, defaultWidth: 200, max: 700 },
 ];
 window.Kiel = { csrfToken, request, toast, confirm, setLoading, errorMessage, taskColumnsConfig: taskColumnDefinitions };
 window.KielTasks = {

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Ticket;
+use App\Models\Sprint;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Exceptions\HttpResponseException;
@@ -30,7 +31,7 @@ class TimelineService
         return [
             'library' => 'frappe-gantt',
             'can_edit' => $this->canEdit($user),
-            'tasks' => $tickets->map(fn (Ticket $ticket) => $this->taskPayload($ticket))->values(),
+            'tasks' => $tickets->map(fn (Ticket $ticket) => $this->taskPayload($ticket, $filters))->values(),
         ];
     }
 
@@ -115,11 +116,21 @@ class TimelineService
     {
         return Ticket::query()
             ->notArchived()
-            ->with(['client', 'software', 'assignee', 'dependency', 'activeBlock'])
+            ->with(['client', 'software', 'assignee', 'dependency', 'activeBlock', 'sprints'])
             ->when(! $user->isKielUser(), fn (Builder $query) => $query->where('client_id', $user->client_id))
             ->when($filters['client_id'] ?? null, fn (Builder $query, $clientId) => $query->where('client_id', $clientId))
             ->when($filters['software_id'] ?? null, fn (Builder $query, $softwareId) => $query->where('software_id', $softwareId))
-            ->when($filters['sprint_id'] ?? null, fn (Builder $query, $sprintId) => $query->whereHas('sprints', fn (Builder $sprintQuery) => $sprintQuery->where('sprints.id', $sprintId)))
+            ->where(function (Builder $query) {
+                $query->whereIn('type', [Ticket::TYPE_TASK, Ticket::TYPE_BUG])
+                    ->orWhere('is_generated_task', true);
+            })
+            ->when(($filters['scope'] ?? 'current_sprint') === 'current_sprint', function (Builder $query) use ($filters) {
+                $ids = $filters['current_sprint_ids'] ?? [];
+                $query->whereHas('sprints', fn (Builder $sprintQuery) => $sprintQuery->whereIn('sprints.id', ! empty($ids) ? $ids : [0]));
+            })
+            ->when(($filters['scope'] ?? null) === 'unsprinted', fn (Builder $query) => $query->whereDoesntHave('sprints'))
+            ->when(($filters['scope'] ?? null) === 'completed_sprints', fn (Builder $query) => $query->whereHas('sprints', fn (Builder $sprintQuery) => $sprintQuery->where('status', Sprint::STATUS_COMPLETED)))
+            ->when(($filters['scope'] ?? null) === 'sprint' && ($filters['sprint_id'] ?? null), fn (Builder $query) => $query->whereHas('sprints', fn (Builder $sprintQuery) => $sprintQuery->where('sprints.id', $filters['sprint_id'])))
             ->when(array_key_exists('assigned_to', $filters) && $filters['assigned_to'] !== null && $filters['assigned_to'] !== '', function (Builder $query) use ($filters) {
                 $filters['assigned_to'] === 'unassigned'
                     ? $query->whereNull('assigned_to')
@@ -129,15 +140,19 @@ class TimelineService
             ->when($filters['status'] ?? null, fn (Builder $query, $status) => $query->where('status', $status));
     }
 
-    public function taskPayload(Ticket $ticket): array
+    public function taskPayload(Ticket $ticket, array $filters = []): array
     {
-        $ticket->loadMissing(['client', 'software', 'assignee', 'dependency', 'activeBlock']);
+        $ticket->loadMissing(['client', 'software', 'assignee', 'dependency', 'activeBlock', 'sprints']);
 
         $isOverdue = $ticket->due_date !== null
             && $ticket->due_date->lt(today())
             && ! in_array($ticket->status, [Ticket::STATUS_BUG_COMPLETED, Ticket::STATUS_FEATURE_COMPLETED], true);
 
-        $timelineClass = 'timeline-urgency-'.$ticket->urgency;
+        $latestSprint = $ticket->sprints->sortByDesc('sprint_no')->first();
+        $currentIds = $filters['current_sprint_ids'] ?? [];
+        $isPreviousSprint = ($latestSprint && $latestSprint->status === Sprint::STATUS_COMPLETED)
+            || (! empty($currentIds) && ! $ticket->sprints->pluck('id')->intersect($currentIds)->isNotEmpty());
+        $timelineClass = $isPreviousSprint ? 'timeline-previous-sprint' : 'timeline-urgency-'.$ticket->urgency;
 
         if ($ticket->isBlocked() || $ticket->activeBlock) {
             $timelineClass .= '-blocked';
@@ -171,6 +186,10 @@ class TimelineService
                 'dependency_id' => $ticket->depends_on_ticket_id,
                 'dependency_label' => $ticket->dependency?->ticket_no,
                 'show_url' => route('tickets.show', $ticket),
+                'sprint_id' => $latestSprint?->id,
+                'sprint_name' => $latestSprint?->name,
+                'sprint_status' => $latestSprint?->status,
+                'is_previous_sprint' => $isPreviousSprint,
             ],
         ];
     }

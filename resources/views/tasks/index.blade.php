@@ -69,18 +69,18 @@
             </section>
 
             <section x-cloak x-show="showFilters" x-collapse x-transition.opacity.duration.150ms class="tasks-filter-panel">
-                <form method="GET" action="{{ route('tasks.index') }}" class="grid gap-3 xl:grid-cols-[minmax(16rem,1fr)_repeat(7,minmax(0,10rem))_auto]">
+                <form method="GET" action="{{ route('tasks.index') }}" class="grid gap-3 xl:grid-cols-[minmax(14rem,1fr)_repeat(8,minmax(0,10rem))_auto]">
                     <input type="hidden" name="view" :value="activeView">
                     <label class="xl:col-span-2"><span class="sr-only">Search tickets</span><input name="search" value="{{ $filters['search'] ?? '' }}" type="search" placeholder="Search..." class="w-full rounded-xl border-slate-200 text-sm"></label>
-                    <select name="type" class="rounded-xl border-slate-200 text-sm"><option value="">All types</option>@foreach (\App\Models\Ticket::TYPES as $type)<option value="{{ $type }}" @selected(($filters['type'] ?? '') === $type)>{{ str($type)->headline() }}</option>@endforeach</select>
+                    <select name="scope" class="rounded-xl border-slate-200 text-sm"><option value="current_sprint" @selected(($filters['scope'] ?? 'current_sprint')==='current_sprint')>Current sprint</option><option value="all" @selected(($filters['scope'] ?? '')==='all')>All tasks</option><option value="unsprinted" @selected(($filters['scope'] ?? '')==='unsprinted')>Unsprinted</option><option value="completed_sprints" @selected(($filters['scope'] ?? '')==='completed_sprints')>Completed sprints</option><option value="sprint" @selected(($filters['scope'] ?? '')==='sprint')>Specific sprint</option></select>
+                    <select name="sprint_id" class="rounded-xl border-slate-200 text-sm"><option value="">Any sprint</option>@foreach ($sprints as $sprint)<option value="{{ $sprint->id }}" @selected((string)($filters['sprint_id'] ?? '')===(string)$sprint->id)>{{ $sprint->name }}</option>@endforeach</select>
                     <select name="urgency" class="rounded-xl border-slate-200 text-sm"><option value="">All urgency</option>@foreach (\App\Models\Ticket::URGENCIES as $urgency)<option value="{{ $urgency }}" @selected(($filters['urgency'] ?? '') === $urgency)>{{ str($urgency)->headline() }}</option>@endforeach</select>
                     <select name="status" class="rounded-xl border-slate-200 text-sm"><option value="">All statuses</option>@foreach (\App\Models\Ticket::STATUSES as $statusOption)<option value="{{ $statusOption }}" @selected(($filters['status'] ?? '') === $statusOption)>{{ str($statusOption)->replace('_', ' ')->headline() }}</option>@endforeach</select>
                     <select name="assigned_to" class="rounded-xl border-slate-200 text-sm"><option value="">Any assignee</option><option value="unassigned" @selected(($filters['assigned_to'] ?? '') === 'unassigned')>Unassigned</option>@foreach ($teamMembers as $member)<option value="{{ $member->id }}" @selected((string) ($filters['assigned_to'] ?? '') === (string) $member->id)>{{ $member->name }}</option>@endforeach</select>
                     @if ($isKielUser)<select name="client_id" class="rounded-xl border-slate-200 text-sm"><option value="">All clients</option>@foreach ($clients as $client)<option value="{{ $client->id }}" @selected((string) ($filters['client_id'] ?? '') === (string) $client->id)>{{ $client->name }}</option>@endforeach</select>@endif
                     <select name="software_id" class="rounded-xl border-slate-200 text-sm"><option value="">All software</option>@foreach ($softwares as $software)<option value="{{ $software->id }}" @selected((string) ($filters['software_id'] ?? '') === (string) $software->id)>{{ $software->name }}</option>@endforeach</select>
-                    <select name="blocked" class="rounded-xl border-slate-200 text-sm"><option value="">Any block</option><option value="yes" @selected(($filters['blocked'] ?? '') === 'yes')>Blocked</option><option value="no" @selected(($filters['blocked'] ?? '') === 'no')>Not blocked</option></select>
                     <select name="per_page" class="rounded-xl border-slate-200 text-sm">@foreach ([10, 25, 50, 100] as $size)<option value="{{ $size }}" @selected((int) ($filters['per_page'] ?? 25) === $size)>{{ $size }}/page</option>@endforeach</select>
-                    <div class="flex gap-2"><button type="submit" class="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-black text-white">Apply</button><a href="{{ route('tasks.index', ['view' => $activeView]) }}" class="rounded-xl border border-slate-200 px-4 py-2 text-sm font-black text-slate-600">Reset</a></div>
+                    <div class="flex gap-2"><button type="submit" class="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-black text-white">Apply</button><a href="{{ route('tasks.index', ['view' => $activeView, 'scope' => 'current_sprint']) }}" class="rounded-xl border border-slate-200 px-4 py-2 text-sm font-black text-slate-600">Reset</a></div>
                 </form>
             </section>
 
@@ -89,9 +89,9 @@
                     <div class="flex items-center gap-3"><span class="font-bold">{{ $currentSprint->name }}</span><span class="text-slate-500">{{ $currentSprint->client->name }}</span><span id="tasks-sprint-timer" data-elapsed="{{ $currentSprintStats['elapsed_seconds'] ?? 0 }}">00:00:00</span></div>
                     @if($isKielUser)
                     <div class="flex items-center gap-2">
-                        <button type="button" title="Pause sprint" @click="pauseSprint({{ $currentSprint->id }})" x-show="('{{ $currentSprint->timer_status }}'==='running')">⏸</button>
-                        <button type="button" title="Resume sprint" @click="resumeSprint({{ $currentSprint->id }})" x-show="('{{ $currentSprint->timer_status }}'==='paused')">▶</button>
-                        <button type="button" title="End sprint" @click="endSprint({{ $currentSprint->id }})">⏹</button>
+                        <button type="button" class="sprint-icon-button" title="Pause sprint" @click="pauseSprint({{ $currentSprint->id }})" x-show="('{{ $currentSprint->timer_status }}'==='running')"><svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><rect x="4" y="3" width="4" height="14"/><rect x="12" y="3" width="4" height="14"/></svg><span class="sr-only">Pause sprint</span></button>
+                        <button type="button" class="sprint-icon-button" title="Resume sprint" @click="resumeSprint({{ $currentSprint->id }})" x-show="('{{ $currentSprint->timer_status }}'==='paused')"><svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><polygon points="5,3 17,10 5,17"/></svg><span class="sr-only">Resume sprint</span></button>
+                        <button type="button" class="sprint-icon-button" title="End sprint" @click="endSprint({{ $currentSprint->id }})" @disabled(!@js($currentSprintStats['can_end'] ?? false))><svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><rect x="4" y="4" width="12" height="12"/></svg><span class="sr-only">End sprint</span></button>
                     </div>
                     @endif
                 </section>

@@ -13,9 +13,9 @@
   </div>
   @if($isKielUser)
   <div class="flex gap-2">
-    <button class="sprint-icon-button" x-show="running" @click="pauseSprint({{ $currentSprint->id }})" title="Pause sprint">▮▮<span class="sr-only">Pause sprint</span></button>
-    <button class="sprint-icon-button" x-show="!running" @click="resumeSprint({{ $currentSprint->id }})" title="Resume sprint">▶<span class="sr-only">Resume sprint</span></button>
-    <button class="sprint-icon-button" @click="endSprint({{ $currentSprint->id }})" @disabled(!($currentSprintStats['can_end'] ?? false)) title="{{ ($currentSprintStats['can_end'] ?? false) ? 'End sprint' : 'All sprint tasks must be completed, rejected, or blocked before ending.' }}">■<span class="sr-only">End sprint</span></button>
+    <button class="sprint-icon-button" x-show="running" @click="pauseSprint({{ $currentSprint->id }})" title="Pause sprint"><svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><rect x="4" y="3" width="4" height="14"/><rect x="12" y="3" width="4" height="14"/></svg><span class="sr-only">Pause sprint</span></button>
+    <button class="sprint-icon-button" x-show="!running" @click="resumeSprint({{ $currentSprint->id }})" title="Resume sprint"><svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><polygon points="5,3 17,10 5,17"/></svg><span class="sr-only">Resume sprint</span></button>
+    <button class="sprint-icon-button" @click="endSprint({{ $currentSprint->id }})" @disabled(!($currentSprintStats['can_end'] ?? false)) title="{{ ($currentSprintStats['can_end'] ?? false) ? 'End sprint' : 'All sprint tasks must be completed, rejected, or blocked before ending.' }}"><svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><rect x="4" y="4" width="12" height="12"/></svg><span class="sr-only">End sprint</span></button>
   </div>
   @endif
 </div>
