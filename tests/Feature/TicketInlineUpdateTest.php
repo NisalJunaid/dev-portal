@@ -132,6 +132,67 @@ class TicketInlineUpdateTest extends TestCase
         $this->assertNotSame('Client edit attempt', $ticket->refresh()->title);
     }
 
+
+    public function test_moving_generated_task_to_next_sprint_archives_task_and_returns_source_feature(): void
+    {
+        $this->seed(RoleSeeder::class);
+        [$client, $software, $clientUser] = $this->clientWorkspace();
+        $developer = $this->kielDeveloper();
+
+        $feature = $this->ticket($client, $software, $clientUser, Ticket::TYPE_FEATURE, Ticket::STATUS_IN_PROGRESS);
+        $task = $this->ticket($client, $software, $clientUser, Ticket::TYPE_TASK, Ticket::STATUS_IN_PROGRESS);
+        $task->update(['is_generated_task' => true, 'source_feature_id' => $feature->id, 'generated_from_sprint_id' => 1]);
+
+        $response = $this->actingAs($developer)
+            ->patchJson(route('tickets.inline-update', $task), ['field' => 'status', 'value' => Ticket::STATUS_NEXT_SPRINT])
+            ->assertOk()
+            ->assertJsonPath('removed_from_tasks', true)
+            ->assertJsonPath('feature.id', $feature->id)
+            ->assertJsonPath('feature.status', Ticket::STATUS_NEXT_SPRINT);
+
+        $task->refresh();
+        $feature->refresh();
+
+        $this->assertNotNull($task->archived_at);
+        $this->assertSame(Ticket::STATUS_BACKLOG, $task->status);
+        $this->assertSame(Ticket::STATUS_NEXT_SPRINT, $feature->status);
+        $this->assertEmpty($task->sprints()->pluck('sprints.id')->all());
+        $this->assertFalse(Ticket::query()->notArchived()->whereKey($task->id)->exists());
+        $response->assertJsonPath('feature_drawer_url', route('tickets.drawer', $feature));
+    }
+
+    public function test_moving_non_generated_task_to_next_sprint_converts_to_feature(): void
+    {
+        $this->seed(RoleSeeder::class);
+        [$client, $software, $clientUser] = $this->clientWorkspace();
+        $developer = $this->kielDeveloper();
+
+        $task = $this->ticket($client, $software, $clientUser, Ticket::TYPE_TASK, Ticket::STATUS_IN_PROGRESS);
+
+        $this->actingAs($developer)
+            ->patchJson(route('tickets.inline-update', $task), ['field' => 'status', 'value' => Ticket::STATUS_NEXT_SPRINT])
+            ->assertOk()
+            ->assertJsonPath('removed_from_tasks', true)
+            ->assertJsonPath('feature.id', $task->id);
+
+        $task->refresh();
+        $this->assertSame(Ticket::TYPE_FEATURE, $task->type);
+        $this->assertSame(Ticket::STATUS_NEXT_SPRINT, $task->status);
+        $this->assertFalse(Ticket::query()->whereIn('type', [Ticket::TYPE_TASK, Ticket::TYPE_BUG])->whereKey($task->id)->exists());
+    }
+
+    public function test_bug_ticket_cannot_move_to_next_sprint_via_inline_status_update(): void
+    {
+        $this->seed(RoleSeeder::class);
+        [$client, $software, $clientUser] = $this->clientWorkspace();
+        $developer = $this->kielDeveloper();
+        $bug = $this->ticket($client, $software, $clientUser, Ticket::TYPE_BUG, Ticket::STATUS_BUG_PENDING);
+
+        $this->actingAs($developer)
+            ->patchJson(route('tickets.inline-update', $bug), ['field' => 'status', 'value' => Ticket::STATUS_NEXT_SPRINT])
+            ->assertStatus(422);
+    }
+
     private function clientWorkspace(): array
     {
         $client = Client::create([
