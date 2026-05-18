@@ -513,3 +513,32 @@ Production hardening and deployment preparation.
 
 ### Next planned task
 Production hardening and deployment preparation.
+
+## Completed: Tasks List grouped-status scrollbar + live cross-view status sync
+
+### Summary
+- List grouped-status sections now share a single outer scroll container; per-section inner scrollbars were removed.
+- Drag handle column spacing was tightened to a compact minimal-width grip next to ticket ID.
+- List drag/drop now explicitly rehomes rows to backend-confirmed sections after successful status updates.
+- Empty list sections now keep a placeholder table row drop target (`Drop tasks here`) and section counts/empty states update live.
+- Cross-view sync improved: task update/remove events now mark Board and Timeline dirty and List rows update immediately.
+- Consolidated duplicate `window.KielTasks` definitions into one canonical object with emit + dirty view helpers.
+
+### Files changed
+- `resources/views/tasks/partials/list-view.blade.php`
+- `resources/js/app.js`
+- `resources/views/tasks/index.blade.php`
+- `resources/css/app.css`
+- `docs/IMPLEMENTATION_TRACKER.md`
+
+### Tests/checks run
+- `php artisan view:clear`
+- `php artisan optimize:clear`
+- `php artisan route:list`
+- `php artisan test`
+
+### Known issues
+- In environments without Composer `vendor/` dependencies, artisan/test commands may fail before Laravel boot.
+
+### Next planned task
+Production hardening and deployment preparation.

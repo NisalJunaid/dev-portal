@@ -106,14 +106,24 @@ const taskColumnDefinitions = [
     { key: 'updated_at', label: 'Last updated', min: 180, defaultWidth: 200, max: 700 },
 ];
 window.Kiel = { csrfToken, request, toast, confirm, setLoading, errorMessage, taskColumnsConfig: taskColumnDefinitions };
-window.KielTasks = window.KielTasks || {};
-window.KielTasks.emitTaskUpdated = function (ticket) {
-    window.dispatchEvent(new CustomEvent('kiel:task-updated', { detail: { ticket } }));
-};
-window.KielTasks.emitTaskCreated = function (ticket) {
-    window.dispatchEvent(new CustomEvent('kiel:task-created', { detail: { ticket } }));
+window.KielTasks = {
+    dirtyViews: new Set(),
+    emitTaskUpdated(ticket) { window.dispatchEvent(new CustomEvent('kiel:task-updated', { detail: { ticket } })); },
+    emitUpdated(ticket) { this.emitTaskUpdated(ticket); },
+    emitTaskCreated(ticket) { window.dispatchEvent(new CustomEvent('kiel:task-created', { detail: { ticket } })); },
+    emitCreated(ticket) { this.emitTaskCreated(ticket); },
+    emitRemoved(ticketId, reason = '') { window.dispatchEvent(new CustomEvent('kiel:task-removed', { detail: { ticketId, reason } })); },
+    markDirty(view) { this.dirtyViews.add(view); },
+    clearDirty(view) { this.dirtyViews.delete(view); },
+    isDirty(view) { return this.dirtyViews.has(view); },
 };
 
+const listSectionForTicket = (ticket = {}) => {
+    if (ticket.list_section) return ticket.list_section;
+    if (['bug_completed', 'feature_completed', 'task_completed'].includes(ticket.status)) return 'completed';
+    if (ticket.status === 'in_progress') return 'in_progress';
+    return 'backlog';
+};
 
 
 const bindAjaxActions = () => {
@@ -334,37 +344,86 @@ window.KielKanban = {
 
 window.KielTimeline = { initAll() { document.querySelectorAll('[data-timeline-view]').forEach(() => {}); } };
 
-window.KielTasks = window.KielTasks || {
-    dirtyViews: new Set(),
-    emitUpdated(ticket) { window.dispatchEvent(new CustomEvent('kiel:task-updated', { detail: { ticket } })); },
-    emitRemoved(ticketId, reason) { window.dispatchEvent(new CustomEvent('kiel:task-removed', { detail: { ticketId, reason } })); },
-    emitCreated(ticket) { window.dispatchEvent(new CustomEvent('kiel:task-created', { detail: { ticket } })); },
-};
-
 window.KielTaskList = {
+    updateListRowFromPayload(row, ticket) {
+        if (!row || !ticket) return;
+        const section = listSectionForTicket(ticket);
+        row.dataset.currentStatus = ticket.status || row.dataset.currentStatus;
+        row.dataset.currentSection = section;
+        const statusLabel = row.querySelector('[data-list-status-label]');
+        if (statusLabel && ticket.status_label) statusLabel.textContent = ticket.status_label;
+        const title = row.querySelector('[data-list-title]');
+        if (title && ticket.title) title.textContent = ticket.title;
+        const assignee = row.querySelector('[data-list-assignee]');
+        if (assignee) assignee.textContent = ticket.assignee_name || ticket.assignee?.name || 'Unassigned';
+        const ticketNo = row.querySelector('[data-list-ticket-no]');
+        if (ticketNo && ticket.ticket_no) ticketNo.textContent = ticket.ticket_no;
+    },
+    moveListRowToSection(row, sectionKey, index = null) {
+        const targetBody = document.querySelector(`[data-list-section-body][data-section="${sectionKey}"]`);
+        if (!targetBody || !row) return;
+        targetBody.querySelector('[data-list-empty-row]')?.remove();
+        const taskRows = Array.from(targetBody.querySelectorAll('[data-list-task-row]'));
+        if (index === null || index >= taskRows.length) targetBody.appendChild(row);
+        else targetBody.insertBefore(row, taskRows[index] || null);
+        row.dataset.currentSection = sectionKey;
+    },
+    updateListEmptyStates() {
+        document.querySelectorAll('[data-list-section-body]').forEach((body) => {
+            const hasRows = body.querySelector('[data-list-task-row]');
+            const emptyRow = body.querySelector('[data-list-empty-row]');
+            if (hasRows && emptyRow) emptyRow.remove();
+            if (!hasRows && !emptyRow) {
+                body.insertAdjacentHTML('beforeend', '<tr data-list-empty-row><td colspan="5" class="px-4 py-4 text-xs text-slate-400">Drop tasks here</td></tr>');
+            }
+        });
+    },
+    updateListSectionCounts() {
+        document.querySelectorAll('[data-list-section]').forEach((section) => {
+            const count = section.querySelectorAll('[data-list-task-row]').length;
+            section.querySelector('[data-list-section-count]')?.replaceChildren(String(count));
+        });
+        this.updateListEmptyStates();
+    },
+    restoreListRow(row, previousSection, previousIndex) {
+        this.moveListRowToSection(row, previousSection, previousIndex);
+        this.updateListSectionCounts();
+    },
     async initAll(force = false) {
         await loadSortable().catch(() => window.Kiel.toast('List drag/drop unavailable.', 'error'));
+        this.updateListSectionCounts();
         document.querySelectorAll('[data-list-section-body]').forEach((body) => {
             if (force && body._kielSortable) { body._kielSortable.destroy(); body._kielSortable = null; }
             if (body._kielSortable || !window.Sortable) return;
             body._kielSortable = window.Sortable.create(body, {
                 group: 'kiel-task-list-status', animation: 160, draggable: '[data-list-task-row]', handle: '[data-list-drag-handle]',
                 ghostClass: 'task-list-row-ghost', chosenClass: 'task-list-row-chosen', dragClass: 'task-list-row-drag', fallbackOnBody: true, emptyInsertThreshold: 24,
+                onStart: () => document.body.classList.add('is-task-list-dragging'),
                 onEnd: async (evt) => {
-                    const row = evt.item; const to = evt.to.dataset.section; const from = evt.from.dataset.section;
+                    document.body.classList.remove('is-task-list-dragging');
+                    const row = evt.item;
+                    const to = evt.to.dataset.section;
+                    const from = evt.from.dataset.section;
+                    const previousIndex = evt.oldIndex;
                     if (to === from) return;
                     const type = row.dataset.ticketType;
                     const status = to === 'in_progress' ? 'in_progress' : (to === 'completed' ? (type === 'bug' ? 'bug_completed' : 'task_completed') : 'backlog');
                     try {
                         const payload = await window.Kiel.request(row.dataset.moveUrl, { method: 'PATCH', body: JSON.stringify({ field: 'status', value: status }) });
-                        row.dataset.currentSection = payload.ticket.list_section;
-                        row.dataset.currentStatus = payload.ticket.status;
-                        row.querySelector('[data-list-status-label]').textContent = payload.ticket.status_label;
-                        if (payload.removed_from_tasks) { row.remove(); window.KielTasks.emitRemoved(payload.ticket.id, 'moved_to_next_sprint'); }
-                        window.KielTasks.emitUpdated(payload.ticket);
+                        if (payload.removed_from_tasks) {
+                            row.remove();
+                            this.updateListSectionCounts();
+                            window.KielTasks.emitRemoved(payload.ticket.id, 'moved_to_next_sprint');
+                            return;
+                        }
+                        const newSection = listSectionForTicket(payload.ticket || {});
+                        this.moveListRowToSection(row, newSection, evt.newIndex ?? null);
+                        this.updateListRowFromPayload(row, payload.ticket);
+                        this.updateListSectionCounts();
+                        window.KielTasks.emitTaskUpdated(payload.ticket);
                     } catch (e) {
                         window.Kiel.toast(e.message || 'Unable to move task.', 'error');
-                        evt.from.insertBefore(row, evt.from.children[evt.oldIndex] || null);
+                        this.restoreListRow(row, from, previousIndex);
                     }
                 },
             });
@@ -373,8 +432,24 @@ window.KielTaskList = {
 };
 
 document.addEventListener('DOMContentLoaded', () => { window.KielTaskList.initAll(); window.KielKanban?.initAll(); });
-window.addEventListener('kiel:task-updated', () => { window.KielKanban?.initAll(true); });
+window.addEventListener('kiel:task-updated', (event) => {
+    const ticket = event.detail?.ticket;
+    if (!ticket?.id) return;
+    document.querySelectorAll(`[data-list-task-row][data-ticket-id="${ticket.id}"]`).forEach((row) => {
+        if (ticket.removed_from_tasks) { row.remove(); return; }
+        const section = listSectionForTicket(ticket);
+        window.KielTaskList.moveListRowToSection(row, section);
+        window.KielTaskList.updateListRowFromPayload(row, ticket);
+    });
+    window.KielTaskList.updateListSectionCounts();
+    window.KielTasks.markDirty('board');
+    window.KielTasks.markDirty('timeline');
+    window.KielKanban?.initAll(true);
+});
 window.addEventListener('kiel:task-removed', (event) => {
     document.querySelectorAll(`[data-list-task-row][data-ticket-id="${event.detail.ticketId}"]`).forEach((el) => el.remove());
     document.querySelectorAll(`[data-kanban-card][data-ticket-id="${event.detail.ticketId}"]`).forEach((el) => el.remove());
+    window.KielTaskList.updateListSectionCounts();
+    window.KielTasks.markDirty('board');
+    window.KielTasks.markDirty('timeline');
 });
