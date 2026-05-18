@@ -1,5 +1,27 @@
 # Implementation Tracker
 
+## Completed: App shell navigation/layout jank stabilization
+
+### Summary
+- stabilized app shell layout before Alpine initialization by setting server-rendered default CSS variables on the shell root and switching runtime updates to `applyShellVars()` (no root `:style` dependency).
+- moved sidebar/content sizing to CSS variable-driven classes (`.app-shell-sidebar`, `.app-shell-content`) so width/padding are stable before JS boots.
+- added smooth navigation transition overlay (with optional minimal top progress bar) triggered only on normal sidebar route clicks via `handleNavClick`.
+- added page content fade-in animation on load and reduced-motion guards for shell transitions/animations.
+- added/kept global `x-cloak` CSS and resize-transition suppression (`body.is-resizing-sidebar`) to reduce visible layout shift during drag resize.
+- preserved normal Laravel full-page route navigation and existing sidebar collapse/resize persistence behavior.
+
+### Tests/checks run
+- `php artisan view:clear`
+- `php artisan optimize:clear`
+- `php artisan route:list`
+- `php artisan test`
+
+### Known issues
+- If Composer dependencies under `vendor/` are missing, artisan/test commands fail before Laravel boot in this container.
+
+### Next planned task
+Production hardening and deployment preparation.
+
 ## Issue: invalid `js()` helper usage in Blade causing `/tasks` crash
 
 ### Summary
