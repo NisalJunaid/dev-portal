@@ -294,11 +294,6 @@ class Ticket extends Model
         return $this->isFeature() && $this->parent_ticket_id !== null;
     }
 
-    public function isSubtask(): bool
-    {
-        return $this->isTask() && $this->parent_ticket_id !== null;
-    }
-
 
     public function listSectionKey(?string $workType = null): string
     {
