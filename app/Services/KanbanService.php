@@ -78,7 +78,9 @@ class KanbanService
         if ($workType === 'bugs') {
             $query->where('type', Ticket::TYPE_BUG);
         } elseif ($workType === 'tasks') {
-            $query->where('type', Ticket::TYPE_TASK);
+            $query->where(function ($q) {
+                $q->where('type', Ticket::TYPE_TASK)->orWhere('is_generated_task', true);
+            });
         }
 
         $scope = $filters['scope'] ?? 'current_sprint';

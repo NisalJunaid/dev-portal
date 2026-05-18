@@ -751,3 +751,27 @@ Production hardening and deployment preparation.
 
 ### Next planned task
 Production hardening and deployment preparation.
+
+## Completed: Live list/board status sync and Bugs board work-type switching
+
+### Summary
+- Fixed `resources/js/app.js` list row update helper bugs (`targetRow` reference and null-row work-type lookup) so row payload updates run safely after inline updates.
+- Fixed list drag/drop flow to always use backend-confirmed payload and explicitly move rows to computed sections for both Tasks and Bugs (no reliance on temporary Sortable placement).
+- Scoped list row movement to the current `[data-list-board]` to avoid cross-board/stale partial section targeting.
+- Improved bug section/status mapping to keep Bugs list grouped by `pending/blocked/completed` with correct `bug_*` status transitions.
+- Added direct Kanban card sync helper (`window.KielKanban.applyTicketUpdate`) and wired `kiel:task-updated` to move/update visible board cards immediately.
+- Updated Tasks workspace tab switching/partial refresh behavior so `work_type` is pushed to URL + sent in partial requests and board columns reinitialize from response payload.
+- Updated inline ticket payload list section resolution to use ticket type-aware work type (`bugs` for bugs, `tasks` otherwise).
+- Expanded blocked timer pause compatibility to include `task_blocked` in controller status update logic.
+
+### Tests/checks run
+- `php artisan test`
+- `php artisan route:list`
+- `php artisan view:clear`
+- `php artisan optimize:clear`
+
+### Known issues
+- Commands may fail in environments without Composer `vendor/` dependencies.
+
+### Next planned task
+Production hardening and deployment preparation.

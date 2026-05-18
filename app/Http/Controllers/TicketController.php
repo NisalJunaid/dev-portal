@@ -399,7 +399,7 @@ class TicketController extends Controller
         if ($oldValues['status'] !== $ticket->status) {
             $this->ticketActivityService->log($ticket, 'status changed', 'Ticket status updated.', $request->user(), $oldValues['status'], $ticket->status);
 
-            if (in_array($ticket->status, [Ticket::STATUS_BUG_BLOCKED, Ticket::STATUS_FEATURE_BLOCKED], true)) {
+            if (in_array($ticket->status, [Ticket::STATUS_BUG_BLOCKED, Ticket::STATUS_FEATURE_BLOCKED, Ticket::STATUS_TASK_BLOCKED], true)) {
                 $this->timeTrackingService->pauseRunningTimersForBlockedTicket($ticket, $request->user());
             }
         }
@@ -591,7 +591,7 @@ class TicketController extends Controller
             'status' => $ticket->status,
             'status_label' => $ticket->formattedStatus(),
             'type' => $ticket->type,
-            'list_section' => $ticket->listSectionKey(request('work_type')),
+            'list_section' => $ticket->listSectionKey($ticket->isBug() ? 'bugs' : 'tasks'),
             'column' => $this->kanbanService->ticketPayload($ticket, KanbanService::VIEW_ALL)['column'],
             'blocked' => $ticket->isBlocked(),
             'sprint_cycle' => $latestSprint ? '#'.$latestSprint->sprint_no.' '.$latestSprint->name : 'No sprint',

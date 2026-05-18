@@ -122,7 +122,9 @@ const listSectionForTicket = (ticket = {}, workType = 'tasks') => {
         return 'pending';
     }
     if (['bug_completed', 'feature_completed', 'task_completed'].includes(ticket.status)) return 'completed';
+    if (['task_blocked', 'feature_blocked'].includes(ticket.status)) return 'backlog';
     if (ticket.status === 'in_progress') return 'in_progress';
+
     return 'backlog';
 };
 
@@ -360,6 +362,32 @@ window.KielKanban = {
             updateKanbanEmptyStates(board);
         });
     },
+    applyTicketUpdate(ticket) {
+        if (!ticket?.id) return;
+
+        const card = document.querySelector(`[data-kanban-card][data-ticket-id="${ticket.id}"]`);
+        if (!card) {
+            window.KielTasks.markDirty('board');
+            return;
+        }
+
+        if (ticket.column) {
+            const board = card.closest('[data-kanban-board]');
+            const targetColumn = board?.querySelector(`[data-kanban-column][data-column="${ticket.column}"]`);
+            if (targetColumn && card.parentElement !== targetColumn) {
+                targetColumn.querySelector('[data-empty-state]')?.classList.add('hidden');
+                targetColumn.appendChild(card);
+            }
+        }
+
+        const statusLabel = card.querySelector('[data-kanban-status-label]');
+        if (statusLabel && ticket.status_label) statusLabel.textContent = ticket.status_label;
+
+        const assignee = card.querySelector('[data-kanban-assignee-label]');
+        if (assignee) assignee.textContent = ticket.assignee_name || ticket.assignee || 'Unassigned';
+
+        updateKanbanEmptyStates(card.closest('[data-kanban-board]'));
+    },
 };
 
 window.KielTimeline = { initAll() { document.querySelectorAll('[data-timeline-view]').forEach(() => {}); } };
@@ -368,26 +396,60 @@ window.KielTaskList = {
     statusOptionsForType,
     updateListRowFromPayload(row, ticket) {
         if (!row || !ticket) return;
-        const workType = targetRow.closest('[data-list-board]')?.dataset.workType || 'tasks';
+
+        const workType = row.closest('[data-list-board]')?.dataset.workType || 'tasks';
         const section = listSectionForTicket(ticket, workType);
+
         row.dataset.currentStatus = ticket.status || row.dataset.currentStatus;
         row.dataset.currentSection = section;
+
         const statusLabel = row.querySelector('[data-list-status-label]');
-        if (statusLabel && ticket.status_label) statusLabel.textContent = ticket.status_label;
+        if (statusLabel && ticket.status_label) {
+            statusLabel.textContent = ticket.status_label;
+        }
+
+        const statusTrigger = row.querySelector('[data-list-status-trigger]');
+        if (statusTrigger && ticket.status) {
+            statusTrigger.dataset.currentValue = ticket.status;
+        }
+
         const title = row.querySelector('[data-list-title]');
-        if (title && ticket.title) title.textContent = ticket.title;
-        const assignee = row.querySelector('[data-list-assignee-label]') || row.querySelector('[data-list-assignee]');
-        if (assignee) assignee.textContent = ticket.assignee_name || ticket.assignee?.name || 'Unassigned';
+        if (title && ticket.title) {
+            const titleButton = title.querySelector('button') || title;
+            titleButton.textContent = ticket.title;
+        }
+
+        const assigneeLabel = row.querySelector('[data-list-assignee-label]');
+        if (assigneeLabel) {
+            assigneeLabel.textContent = ticket.assignee_name || ticket.assignee?.name || 'Unassigned';
+        }
+
+        const assigneeTrigger = row.querySelector('[data-list-assignee-trigger]');
+        if (assigneeTrigger) {
+            assigneeTrigger.dataset.currentValue = ticket.assigned_to ? String(ticket.assigned_to) : '';
+        }
+
         const ticketNo = row.querySelector('[data-list-ticket-no]');
-        if (ticketNo && ticket.ticket_no) ticketNo.textContent = ticket.ticket_no;
+        if (ticketNo && ticket.ticket_no) {
+            ticketNo.textContent = ticket.ticket_no;
+        }
     },
     moveRowToSection(row, sectionKey, index = null) {
-        const targetBody = document.querySelector(`[data-list-section-body][data-section="${sectionKey}"]`);
+        const board = row?.closest('[data-list-board]') || document.querySelector('[data-list-board]');
+        const targetBody = board?.querySelector(`[data-list-section-body][data-section="${sectionKey}"]`);
+
         if (!targetBody || !row) return;
+
         targetBody.querySelector('[data-list-empty-row]')?.remove();
+
         const taskRows = Array.from(targetBody.querySelectorAll('[data-list-task-row]'));
-        if (index === null || index >= taskRows.length) targetBody.appendChild(row);
-        else targetBody.insertBefore(row, taskRows[index] || null);
+
+        if (index === null || index >= taskRows.length) {
+            targetBody.appendChild(row);
+        } else {
+            targetBody.insertBefore(row, taskRows[index] || null);
+        }
+
         row.dataset.currentSection = sectionKey;
     },
     updateListEmptyStates() {
@@ -410,8 +472,9 @@ window.KielTaskList = {
     applyTicketUpdate(ticket, row = null) {
         const targetRow = row || document.querySelector(`[data-list-task-row][data-ticket-id="${ticket?.id}"]`);
         if (!targetRow || !ticket) return;
-        const workType = row.closest('[data-list-board]')?.dataset.workType || 'tasks';
+        const workType = targetRow.closest('[data-list-board]')?.dataset.workType || 'tasks';
         const section = listSectionForTicket(ticket, workType);
+
         this.moveRowToSection(targetRow, section);
         this.updateListRowFromPayload(targetRow, ticket);
         this.updateCounts();
@@ -446,17 +509,25 @@ window.KielTaskList = {
                         if (payload.removed_from_tasks) {
                             row.remove();
                             this.updateCounts();
-                            window.KielTasks.emitRemoved(payload.ticket.id, 'moved_to_next_sprint');
+                            window.KielTasks.emitRemoved(payload.ticket?.id || row.dataset.ticketId, 'moved_to_next_sprint');
                             return;
                         }
-                        const newSection = listSectionForTicket(payload.ticket || {}, workType);
-                        this.moveRowToSection(row, newSection, evt.newIndex ?? null);
+                        if (!payload.ticket) {
+                            throw new Error('The server did not return an updated ticket payload.');
+                        }
+
+                        const newSection = listSectionForTicket(payload.ticket, workType);
+
+                        this.moveRowToSection(row, newSection, null);
                         this.updateListRowFromPayload(row, payload.ticket);
                         this.updateCounts();
+
                         window.KielTasks.emitTaskUpdated(payload.ticket);
+                        window.Kiel.toast(payload.message || 'Status updated.', 'success');
                     } catch (e) {
-                        window.Kiel.toast(e.message || 'Unable to move task.', 'error');
                         this.restoreListRow(row, from, previousIndex);
+                        this.updateCounts();
+                        window.Kiel.toast(e.message || 'Unable to move task.', 'error');
                     }
                 },
             });
@@ -476,9 +547,8 @@ window.addEventListener('kiel:task-updated', (event) => {
         window.KielTaskList.updateListRowFromPayload(row, ticket);
     });
     window.KielTaskList.updateCounts();
-    window.KielTasks.markDirty('board');
+    window.KielKanban?.applyTicketUpdate?.(ticket);
     window.KielTasks.markDirty('timeline');
-    window.KielKanban?.initAll(true);
 });
 window.addEventListener('kiel:task-removed', (event) => {
     document.querySelectorAll(`[data-list-task-row][data-ticket-id="${event.detail.ticketId}"]`).forEach((el) => el.remove());
