@@ -586,3 +586,25 @@ Production hardening and deployment preparation.
 
 ### Next planned task
 Production hardening and deployment preparation.
+
+## Completed: Move-to-next-sprint rollback reliability for Tasks -> Sprints
+
+### Summary
+- fixed task rollback to next sprint so generated sprint tasks now reliably return their source feature request to `next_sprint` planning state and immediately remove/archive the operational task record from active task views.
+- added explicit return markers on features (`returned_to_sprint_at`, `returned_from_task_id`) to preserve rollback provenance.
+- corrected Sprint dashboard approved-features query behavior to avoid hiding valid `next_sprint` items due to historical generated-task relationships while still preventing active in-sprint duplication.
+- updated sprint start lifecycle to mark source features as `feature_in_sprint` when a generated implementation task is created.
+- updated inline update payload/UX hooks for next-sprint rollback responses to keep Tasks and Sprints UI in sync.
+
+### Tests/checks run
+- `php artisan migrate`
+- `php artisan test`
+- `php artisan route:list`
+- `php artisan view:clear`
+- `php artisan optimize:clear`
+
+### Known issues
+- if Composer vendor dependencies are unavailable in a local container, artisan/test commands can fail before boot.
+
+### Next planned task
+Production hardening and deployment preparation.

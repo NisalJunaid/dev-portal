@@ -603,12 +603,14 @@ class TicketController extends Controller
                     'start_date' => $ticket->start_date,
                     'due_date' => $ticket->due_date,
                     'estimated_hours' => $ticket->estimated_hours,
+                    'returned_to_sprint_at' => now(),
+                    'returned_from_task_id' => $ticket->id,
                 ]);
-                $this->ticketActivityService->log($feature, 'status changed', 'Feature returned to next sprint backlog.', $request->user());
+                $this->ticketActivityService->log($feature, 'status changed', 'Feature returned to next sprint planning.', $request->user());
 
                 $ticket->update([
                     'archived_at' => now(),
-                    'archived_reason' => 'Moved back to feature request backlog for next sprint.',
+                    'archived_reason' => 'Returned to feature request backlog for next sprint.',
                     'generated_from_sprint_id' => null,
                     'status' => Ticket::STATUS_BACKLOG,
                 ]);
@@ -619,11 +621,12 @@ class TicketController extends Controller
                     'is_generated_task' => false,
                     'generated_from_sprint_id' => null,
                     'source_feature_id' => null,
+                    'returned_to_sprint_at' => now(),
                 ]);
                 $feature = $ticket;
             }
 
-            $this->ticketActivityService->log($ticket, 'status changed', 'Task moved back to feature requests for next sprint.', $request->user());
+            $this->ticketActivityService->log($ticket, 'status changed', 'Task moved back to feature request.', $request->user());
         });
 
         $ticket->refresh()->load(['client', 'software', 'assignee', 'sprints']);
@@ -635,7 +638,9 @@ class TicketController extends Controller
             'message' => 'Task moved back to feature requests for next sprint.',
             'ticket' => $this->inlineTicketPayload($ticket),
             'removed_from_tasks' => true,
+            'ticket_id' => $ticket->id,
             'feature' => $feature ? $this->inlineTicketPayload($feature) : null,
+            'feature_status' => $feature?->status,
             'feature_drawer_url' => $feature ? route('tickets.drawer', $feature) : null,
         ]);
     }
