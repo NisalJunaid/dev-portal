@@ -333,3 +333,48 @@ window.KielKanban = {
 };
 
 window.KielTimeline = { initAll() { document.querySelectorAll('[data-timeline-view]').forEach(() => {}); } };
+
+window.KielTasks = window.KielTasks || {
+    dirtyViews: new Set(),
+    emitUpdated(ticket) { window.dispatchEvent(new CustomEvent('kiel:task-updated', { detail: { ticket } })); },
+    emitRemoved(ticketId, reason) { window.dispatchEvent(new CustomEvent('kiel:task-removed', { detail: { ticketId, reason } })); },
+    emitCreated(ticket) { window.dispatchEvent(new CustomEvent('kiel:task-created', { detail: { ticket } })); },
+};
+
+window.KielTaskList = {
+    async initAll(force = false) {
+        await loadSortable().catch(() => window.Kiel.toast('List drag/drop unavailable.', 'error'));
+        document.querySelectorAll('[data-list-section-body]').forEach((body) => {
+            if (force && body._kielSortable) { body._kielSortable.destroy(); body._kielSortable = null; }
+            if (body._kielSortable || !window.Sortable) return;
+            body._kielSortable = window.Sortable.create(body, {
+                group: 'kiel-task-list-status', animation: 160, draggable: '[data-list-task-row]', handle: '[data-list-drag-handle]',
+                ghostClass: 'task-list-row-ghost', chosenClass: 'task-list-row-chosen', dragClass: 'task-list-row-drag', fallbackOnBody: true, emptyInsertThreshold: 24,
+                onEnd: async (evt) => {
+                    const row = evt.item; const to = evt.to.dataset.section; const from = evt.from.dataset.section;
+                    if (to === from) return;
+                    const type = row.dataset.ticketType;
+                    const status = to === 'in_progress' ? 'in_progress' : (to === 'completed' ? (type === 'bug' ? 'bug_completed' : 'task_completed') : 'backlog');
+                    try {
+                        const payload = await window.Kiel.request(row.dataset.moveUrl, { method: 'PATCH', body: JSON.stringify({ field: 'status', value: status }) });
+                        row.dataset.currentSection = payload.ticket.list_section;
+                        row.dataset.currentStatus = payload.ticket.status;
+                        row.querySelector('[data-list-status-label]').textContent = payload.ticket.status_label;
+                        if (payload.removed_from_tasks) { row.remove(); window.KielTasks.emitRemoved(payload.ticket.id, 'moved_to_next_sprint'); }
+                        window.KielTasks.emitUpdated(payload.ticket);
+                    } catch (e) {
+                        window.Kiel.toast(e.message || 'Unable to move task.', 'error');
+                        evt.from.insertBefore(row, evt.from.children[evt.oldIndex] || null);
+                    }
+                },
+            });
+        });
+    },
+};
+
+document.addEventListener('DOMContentLoaded', () => { window.KielTaskList.initAll(); window.KielKanban?.initAll(); });
+window.addEventListener('kiel:task-updated', () => { window.KielKanban?.initAll(true); });
+window.addEventListener('kiel:task-removed', (event) => {
+    document.querySelectorAll(`[data-list-task-row][data-ticket-id="${event.detail.ticketId}"]`).forEach((el) => el.remove());
+    document.querySelectorAll(`[data-kanban-card][data-ticket-id="${event.detail.ticketId}"]`).forEach((el) => el.remove());
+});

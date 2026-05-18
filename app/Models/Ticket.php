@@ -245,6 +245,38 @@ class Ticket extends Model
         return $this->isTask() && $this->parent_ticket_id !== null;
     }
 
+
+    public function listSectionKey(): string
+    {
+        if ($this->isDone()) {
+            return 'completed';
+        }
+
+        if ($this->status === self::STATUS_IN_PROGRESS) {
+            return 'in_progress';
+        }
+
+        return 'backlog';
+    }
+
+    public static function listSections(): array
+    {
+        return [
+            'backlog' => 'Backlog',
+            'in_progress' => 'In Progress',
+            'completed' => 'Completed',
+        ];
+    }
+
+    public static function statusForListSection(self $ticket, string $section): string
+    {
+        return match ($section) {
+            'in_progress' => self::STATUS_IN_PROGRESS,
+            'completed' => $ticket->isBug() ? self::STATUS_BUG_COMPLETED : self::STATUS_TASK_COMPLETED,
+            default => self::STATUS_BACKLOG,
+        };
+    }
+
     public function isDone(): bool
     {
         return in_array($this->status, [self::STATUS_BUG_COMPLETED, self::STATUS_FEATURE_COMPLETED, self::STATUS_TASK_COMPLETED], true);

@@ -481,3 +481,35 @@ Production hardening and deployment preparation.
 
 ### Next planned task
 Production hardening and deployment preparation.
+
+## Completed: Asana-style list sections + drag status + next-sprint reversion + UI polish
+
+### Summary
+- Grouped Tasks list view into Backlog/In Progress/Completed sections with per-section dropzones.
+- Added List-view drag/drop status movement using SortableJS.
+- Added global task event emitters/listeners for cross-view live sync hooks.
+- Added backend task->feature reversion workflow when setting task status to `next_sprint`.
+- Smoothed Feature Request drawer transitions to slide-in drawer behavior.
+- Lightened timeline urgency bar colors and improved label readability/stroke contrast.
+
+### Files changed
+- `app/Models/Ticket.php`
+- `app/Http/Controllers/TicketController.php`
+- `app/Http/Controllers/TaskWorkspaceController.php`
+- `resources/views/tasks/partials/list-view.blade.php`
+- `resources/views/tasks/partials/create-feature-drawer.blade.php`
+- `resources/views/tasks/partials/timeline-view.blade.php`
+- `resources/js/app.js`
+- `docs/IMPLEMENTATION_TRACKER.md`
+
+### Tests/checks run
+- `php artisan test`
+- `php artisan route:list`
+- `php artisan view:clear`
+- `php artisan optimize:clear`
+
+### Known issues
+- Command execution may fail in environments missing Composer `vendor/` dependencies.
+
+### Next planned task
+Production hardening and deployment preparation.
