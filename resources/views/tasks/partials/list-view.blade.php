@@ -20,8 +20,8 @@
 @foreach($sectionTickets as $ticket)
 <tr data-list-task-row data-ticket-id="{{ $ticket->id }}" data-ticket-type="{{ $ticket->type }}" data-current-section="{{ $ticket->listSectionKey() }}" data-current-status="{{ $ticket->status }}" data-move-url="{{ route('tickets.inline-update', $ticket) }}" class="border-t">
 <td class="w-8 py-2 pl-2 pr-1 align-middle"><button type="button" data-list-drag-handle title="Drag to change status" class="flex h-6 w-5 cursor-grab items-center justify-center rounded text-slate-300 transition hover:bg-slate-100 hover:text-slate-600 active:cursor-grabbing">⋮⋮</button></td>
-<td class="whitespace-nowrap py-2 pl-1 pr-3 font-bold"><a data-list-ticket-no data-list-ticket-drawer-url="{{ route('tickets.drawer', $ticket) }}" href="{{ route('tickets.show', $ticket) }}">{{ $ticket->ticket_no }}</a></td>
-<td class="px-4 py-2" data-list-title>{{ $ticket->title }}</td>
+<td class="whitespace-nowrap py-2 pl-1 pr-3 font-bold"><button type="button" data-list-ticket-no data-ticket-drawer-url="{{ route('tickets.drawer', $ticket) }}" class="font-black text-slate-950 transition hover:text-indigo-700">{{ $ticket->ticket_no }}</button></td>
+<td class="px-4 py-2" data-list-title><button type="button" data-ticket-drawer-url="{{ route('tickets.drawer', $ticket) }}" class="text-left font-bold text-slate-800 hover:text-indigo-700">{{ $ticket->title }}</button></td>
 <td class="px-4 py-2 relative overflow-visible"><button type="button" data-list-status-trigger class="badge badge-status cursor-pointer" data-list-status-label>{{ $ticket->formattedStatus() }}</button></td>
 <td class="px-4 py-2" data-list-assignee>{{ $ticket->assignee?->name ?? 'Unassigned' }}</td>
 </tr>

@@ -488,13 +488,14 @@ document.addEventListener('click', (e)=> { if (!e.target.closest('[data-list-sta
 document.addEventListener('keydown', (e)=> { if (e.key === 'Escape') closeAllStatusMenus(); });
 document.addEventListener('click', async (event) => {
     const trigger = event.target.closest('[data-list-status-trigger]');
-    if (!trigger) return;
+    if (!trigger || document.body.classList.contains('is-task-list-dragging')) return;
     event.preventDefault(); event.stopPropagation();
     const row = trigger.closest('[data-list-task-row]'); if (!row) return;
-    const existing = row.querySelector('[data-list-status-menu]'); closeAllStatusMenus(); if (existing) return;
+    const cell = trigger.closest('td'); if (!cell) return;
+    const existing = cell.querySelector('[data-list-status-menu]'); closeAllStatusMenus(); if (existing) return;
     const menu = document.createElement('div');
-    menu.className = 'absolute right-0 top-9 z-50 w-56 rounded-lg border border-slate-200 bg-white shadow-lg p-1';
+    menu.className = 'absolute left-0 top-full z-[80] mt-1 w-56 rounded-xl border border-slate-200 bg-white py-1 shadow-xl';
     menu.setAttribute('data-list-status-menu','1');
-    statusOptionsForType(row.dataset.ticketType).forEach((opt)=>{ const btn=document.createElement('button'); btn.type='button'; btn.className='flex w-full items-center justify-between rounded px-2 py-1.5 text-left text-xs hover:bg-slate-50'; btn.innerHTML=`<span>${opt.label}</span>`; btn.addEventListener('click', async (ev)=>{ev.preventDefault(); ev.stopPropagation(); if(opt.value===row.dataset.currentStatus){closeAllStatusMenus(); return;} try{const payload=await window.Kiel.request(row.dataset.moveUrl,{method:'PATCH',body:JSON.stringify({field:'status', value:opt.value})}); if(payload.removed_from_tasks){row.remove();window.KielTaskList.updateCounts();window.KielTasks.emitRemoved(payload.ticket.id,'moved_to_next_sprint');return;} window.KielTaskList.applyTicketUpdate(payload.ticket,row); window.KielTasks.emitTaskUpdated(payload.ticket); window.Kiel.toast(payload.message||'Status updated.');}catch(err){window.Kiel.toast(err.message||'Unable to update status.','error');} finally {closeAllStatusMenus();}}); menu.appendChild(btn); });
-    trigger.parentElement.appendChild(menu);
+    statusOptionsForType(row.dataset.ticketType).forEach((opt)=>{ const btn=document.createElement('button'); btn.type='button'; btn.className='flex w-full items-center justify-between px-3 py-1.5 text-left text-xs hover:bg-slate-50'; btn.innerHTML=`<span>${opt.label}</span>`; btn.addEventListener('click', async (ev)=>{ev.preventDefault(); ev.stopPropagation(); if(opt.value===row.dataset.currentStatus){closeAllStatusMenus(); return;} try{const payload=await window.Kiel.request(row.dataset.moveUrl,{method:'PATCH',body:JSON.stringify({field:'status', value:opt.value})}); if(payload.removed_from_tasks){row.remove();window.KielTaskList.updateCounts();window.KielTasks.emitRemoved(payload.ticket.id,'moved_to_next_sprint'); if(payload.feature){window.dispatchEvent(new CustomEvent('kiel:feature-request-updated',{detail:{feature:payload.feature}}));} window.Kiel.toast(payload.message || `Moved back to feature request ${payload.feature?.ticket_no ?? ''} for next sprint.`); return;} window.KielTaskList.applyTicketUpdate(payload.ticket,row); window.KielTasks.emitTaskUpdated(payload.ticket); window.Kiel.toast(payload.message||'Status updated.');}catch(err){window.Kiel.toast(err.message||'Unable to update status.','error');} finally {closeAllStatusMenus();}}); menu.appendChild(btn); });
+    cell.appendChild(menu);
 });

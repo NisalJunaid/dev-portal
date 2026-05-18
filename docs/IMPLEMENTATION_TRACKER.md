@@ -563,3 +563,26 @@ Production hardening and deployment preparation.
 
 ### Next planned task
 Production hardening and deployment preparation.
+
+## Completed: Tasks/Sprints workflow fixes (drawer click, status menu anchor, next-sprint rollback)
+
+### Summary
+- Tasks List ticket number/title now open the ticket drawer via non-navigating buttons (no show-page navigation from List).
+- List status dropdown now renders directly at the clicked status pill (`left-0 top-full mt-1`) instead of far-away placement.
+- Fixed `next_sprint` rollback for tasks so generated sprint tasks no longer become visible rejected backlog tasks.
+- Generated tasks moved back to feature requests are archived (`archived_at` / `archived_reason`) and excluded from operational Tasks/Kanban/Timeline queries.
+- Source feature now returns to `next_sprint` (with assignment/urgency/date/hour sync) so it can appear again in Sprints feature queues.
+- Frontend inline status handling now removes moved tasks immediately and dispatches feature refresh event payload.
+
+### Tests/checks run
+- `php artisan migrate`
+- `php artisan test`
+- `php artisan route:list`
+- `php artisan view:clear`
+- `php artisan optimize:clear`
+
+### Known issues
+- If `vendor/` dependencies are missing, artisan and test commands fail before app boot.
+
+### Next planned task
+Production hardening and deployment preparation.

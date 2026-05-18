@@ -52,7 +52,7 @@ class KanbanService
 
     public function queryFor(User $user, string $view)
     {
-        $query = Ticket::query()->with(['client', 'software', 'assignee', 'sprints']);
+        $query = Ticket::query()->notArchived()->with(['client', 'software', 'assignee', 'sprints']);
 
         if (! $user->isKielUser()) {
             $query->where('client_id', $user->client_id);

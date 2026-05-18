@@ -79,6 +79,8 @@ class Ticket extends Model
         'source_feature_id',
         'is_generated_task',
         'generated_from_sprint_id',
+        'archived_at',
+        'archived_reason',
     ];
 
     protected $casts = [
@@ -90,6 +92,7 @@ class Ticket extends Model
         'estimated_hours' => 'decimal:2',
         'actual_completed_at' => 'datetime',
         'is_generated_task' => 'boolean',
+        'archived_at' => 'datetime',
     ];
 
     public function client(): BelongsTo
@@ -195,6 +198,12 @@ class Ticket extends Model
         }
 
         return $query->where('client_id', $user->client_id);
+    }
+
+
+    public function scopeNotArchived(Builder $query): Builder
+    {
+        return $query->whereNull('archived_at');
     }
 
     public function formattedStatus(): string

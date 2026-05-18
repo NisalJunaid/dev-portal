@@ -600,12 +600,17 @@ class TicketController extends Controller
                     'status' => Ticket::STATUS_NEXT_SPRINT,
                     'assigned_to' => $ticket->assigned_to,
                     'urgency' => $ticket->urgency,
+                    'start_date' => $ticket->start_date,
+                    'due_date' => $ticket->due_date,
+                    'estimated_hours' => $ticket->estimated_hours,
                 ]);
                 $this->ticketActivityService->log($feature, 'status changed', 'Feature returned to next sprint backlog.', $request->user());
 
                 $ticket->update([
-                    'status' => Ticket::STATUS_REJECTED,
-                    'rejection_reason' => 'Returned to feature request backlog for future sprint.',
+                    'archived_at' => now(),
+                    'archived_reason' => 'Moved back to feature request backlog for next sprint.',
+                    'generated_from_sprint_id' => null,
+                    'status' => Ticket::STATUS_BACKLOG,
                 ]);
             } else {
                 $ticket->update([
@@ -631,6 +636,7 @@ class TicketController extends Controller
             'ticket' => $this->inlineTicketPayload($ticket),
             'removed_from_tasks' => true,
             'feature' => $feature ? $this->inlineTicketPayload($feature) : null,
+            'feature_drawer_url' => $feature ? route('tickets.drawer', $feature) : null,
         ]);
     }
 

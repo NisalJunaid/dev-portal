@@ -59,7 +59,7 @@ class TaskWorkspaceController extends Controller
         $activeView = in_array($requestedView, ['list', 'board', 'timeline'], true) ? $requestedView : 'list';
         $filters = array_merge(['view' => $activeView], $validated);
 
-        $tickets = Ticket::query()->visibleTo($request->user())->with(['client', 'software', 'submitter', 'assignee', 'sprints'])->withExists(['activeBlock as is_blocked'])
+        $tickets = Ticket::query()->visibleTo($request->user())->notArchived()->with(['client', 'software', 'submitter', 'assignee', 'sprints'])->withExists(['activeBlock as is_blocked'])
             ->when($validated['search'] ?? null, fn ($q, string $search) => $q->where(fn ($q) => $q->where('ticket_no', 'like', '%'.$search.'%')->orWhere('title', 'like', '%'.$search.'%')))
             ->whereIn('type', [Ticket::TYPE_TASK, Ticket::TYPE_BUG])
             ->when($validated['type'] ?? null, fn ($q, string $type) => $q->where('type', $type))

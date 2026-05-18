@@ -114,6 +114,7 @@ class TimelineService
     public function visibleQuery(User $user, array $filters = []): Builder
     {
         return Ticket::query()
+            ->notArchived()
             ->with(['client', 'software', 'assignee', 'dependency', 'activeBlock'])
             ->when(! $user->isKielUser(), fn (Builder $query) => $query->where('client_id', $user->client_id))
             ->when($filters['client_id'] ?? null, fn (Builder $query, $clientId) => $query->where('client_id', $clientId))
