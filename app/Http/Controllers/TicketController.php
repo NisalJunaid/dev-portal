@@ -10,6 +10,7 @@ use App\Models\TicketComment;
 use App\Models\User;
 use App\Services\TicketActivityService;
 use App\Services\TicketBlockService;
+use App\Services\KanbanService;
 use App\Services\TicketNumberService;
 use App\Services\TimeTrackingService;
 use Illuminate\Contracts\View\View;
@@ -28,6 +29,7 @@ class TicketController extends Controller
         private readonly TicketActivityService $ticketActivityService,
         private readonly TimeTrackingService $timeTrackingService,
         private readonly TicketBlockService $ticketBlockService,
+        private readonly KanbanService $kanbanService,
     ) {
     }
 
@@ -459,10 +461,11 @@ class TicketController extends Controller
             $updates = [$field => $normalizedValue];
 
             if ($field === 'status') {
-                if ($ticket->type === Ticket::TYPE_BUG && $normalizedValue === Ticket::STATUS_BUG_COMPLETED) {
+                if (in_array($normalizedValue, [Ticket::STATUS_BUG_COMPLETED, Ticket::STATUS_FEATURE_COMPLETED, Ticket::STATUS_TASK_COMPLETED], true)) {
                     $updates['completed_at'] = $ticket->completed_at ?? now();
                     $updates['actual_completed_at'] = $ticket->actual_completed_at ?? now();
-                } elseif ($ticket->status === Ticket::STATUS_BUG_COMPLETED && $normalizedValue !== Ticket::STATUS_BUG_COMPLETED) {
+                } elseif (in_array($ticket->status, [Ticket::STATUS_BUG_COMPLETED, Ticket::STATUS_FEATURE_COMPLETED, Ticket::STATUS_TASK_COMPLETED], true)
+                    && ! in_array($normalizedValue, [Ticket::STATUS_BUG_COMPLETED, Ticket::STATUS_FEATURE_COMPLETED, Ticket::STATUS_TASK_COMPLETED], true)) {
                     $updates['completed_at'] = null;
                     $updates['actual_completed_at'] = null;
                 }
@@ -540,7 +543,7 @@ class TicketController extends Controller
             'assigned_to' => ['nullable', Rule::exists('users', 'id')],
             'start_date' => ['nullable', 'date'],
             'due_date' => ['nullable', 'date'],
-            'status' => ['required', Rule::in($ticket->isBug() ? Ticket::BUG_STATUSES : ($ticket->isFeature() ? Ticket::FEATURE_STATUSES : array_values(array_unique(array_merge(Ticket::TASK_STATUSES, [Ticket::STATUS_FEATURE_BLOCKED, Ticket::STATUS_REJECTED, Ticket::STATUS_NEXT_SPRINT])))))],
+            'status' => ['required', Rule::in($ticket->isBug() ? Ticket::BUG_STATUSES : ($ticket->isFeature() ? Ticket::FEATURE_STATUSES : array_values(array_unique(array_merge(Ticket::TASK_STATUSES, [Ticket::STATUS_FEATURE_BLOCKED, Ticket::STATUS_FEATURE_COMPLETED, Ticket::STATUS_REJECTED, Ticket::STATUS_NEXT_SPRINT])))))],
         };
     }
 
@@ -577,6 +580,7 @@ class TicketController extends Controller
             'status_label' => $ticket->formattedStatus(),
             'type' => $ticket->type,
             'list_section' => $ticket->listSectionKey(),
+            'column' => $this->kanbanService->ticketPayload($ticket, KanbanService::VIEW_ALL)['column'],
             'blocked' => $ticket->isBlocked(),
             'sprint_cycle' => $latestSprint ? '#'.$latestSprint->sprint_no.' '.$latestSprint->name : 'No sprint',
             'updated_at' => $ticket->updated_at?->format('M j, Y g:i A'),

@@ -21,6 +21,7 @@ class Ticket extends Model
     public const STATUS_RECOMMENDED = 'recommended';
     public const STATUS_NEXT_SPRINT = 'next_sprint';
     public const STATUS_IN_PROGRESS = 'in_progress';
+    public const STATUS_TASK_BLOCKED = 'task_blocked';
     public const STATUS_TASK_COMPLETED = 'task_completed';
     public const STATUS_FEATURE_BLOCKED = 'feature_blocked';
     public const STATUS_FEATURE_COMPLETED = 'feature_completed';
@@ -34,7 +35,7 @@ class Ticket extends Model
     public const TYPES = [self::TYPE_BUG, self::TYPE_FEATURE, self::TYPE_TASK];
     public const BUG_STATUSES = [self::STATUS_BUG_PENDING, self::STATUS_BUG_BLOCKED, self::STATUS_BUG_COMPLETED];
     public const FEATURE_STATUSES = [self::STATUS_FEATURE_APPROVED, self::STATUS_RECOMMENDED, self::STATUS_NEXT_SPRINT, self::STATUS_IN_PROGRESS, self::STATUS_FEATURE_BLOCKED, self::STATUS_FEATURE_COMPLETED];
-    public const TASK_STATUSES = [self::STATUS_BACKLOG, self::STATUS_IN_PROGRESS, self::STATUS_TASK_COMPLETED];
+    public const TASK_STATUSES = [self::STATUS_BACKLOG, self::STATUS_IN_PROGRESS, self::STATUS_TASK_BLOCKED, self::STATUS_TASK_COMPLETED];
 
     public const STATUSES = [
         self::STATUS_BACKLOG,
@@ -45,6 +46,7 @@ class Ticket extends Model
         self::STATUS_RECOMMENDED,
         self::STATUS_NEXT_SPRINT,
         self::STATUS_IN_PROGRESS,
+        self::STATUS_TASK_BLOCKED,
         self::STATUS_TASK_COMPLETED,
         self::STATUS_FEATURE_BLOCKED,
         self::STATUS_FEATURE_COMPLETED,
@@ -197,6 +199,14 @@ class Ticket extends Model
 
     public function formattedStatus(): string
     {
+        if ($this->status === self::STATUS_TASK_COMPLETED) {
+            return 'Completed';
+        }
+
+        if ($this->status === self::STATUS_TASK_BLOCKED) {
+            return 'Blocked';
+        }
+
         return str($this->status)->replace('_', ' ')->headline()->toString();
     }
 
@@ -284,7 +294,7 @@ class Ticket extends Model
 
     public function isBlocked(): bool
     {
-        return in_array($this->status, [self::STATUS_BUG_BLOCKED, self::STATUS_FEATURE_BLOCKED], true);
+        return in_array($this->status, [self::STATUS_BUG_BLOCKED, self::STATUS_FEATURE_BLOCKED, self::STATUS_TASK_BLOCKED], true);
     }
 
     public function isTerminalForSprint(): bool

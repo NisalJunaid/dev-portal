@@ -100,10 +100,10 @@ class KanbanService
                 'priority_order' => $this->priorityForPosition($position),
             ];
 
-            if (in_array($newStatus, [Ticket::STATUS_BUG_COMPLETED, Ticket::STATUS_FEATURE_COMPLETED], true)) {
+            if (in_array($newStatus, [Ticket::STATUS_BUG_COMPLETED, Ticket::STATUS_FEATURE_COMPLETED, Ticket::STATUS_TASK_COMPLETED], true)) {
                 $updates['completed_at'] = $ticket->completed_at ?? now();
                 $updates['actual_completed_at'] = $ticket->actual_completed_at ?? now();
-            } elseif (in_array($oldStatus, [Ticket::STATUS_BUG_COMPLETED, Ticket::STATUS_FEATURE_COMPLETED], true)) {
+            } elseif (in_array($oldStatus, [Ticket::STATUS_BUG_COMPLETED, Ticket::STATUS_FEATURE_COMPLETED, Ticket::STATUS_TASK_COMPLETED], true)) {
                 $updates['completed_at'] = null;
                 $updates['actual_completed_at'] = null;
             }
@@ -203,11 +203,11 @@ class KanbanService
             self::VIEW_BUGS => $ticket->isBug() ? Ticket::BUG_STATUSES : [],
             self::VIEW_FEATURES => $ticket->isFeature() ? Ticket::FEATURE_STATUSES : [],
             self::VIEW_SPRINT => ($ticket->isBug() || $ticket->is_generated_task || $ticket->type === Ticket::TYPE_TASK || $ticket->type === null)
-                ? [Ticket::STATUS_BACKLOG, Ticket::STATUS_IN_PROGRESS, Ticket::STATUS_FEATURE_BLOCKED, Ticket::STATUS_BUG_BLOCKED, Ticket::STATUS_FEATURE_COMPLETED, Ticket::STATUS_BUG_COMPLETED]
+                ? [Ticket::STATUS_BACKLOG, Ticket::STATUS_IN_PROGRESS, Ticket::STATUS_TASK_BLOCKED, Ticket::STATUS_FEATURE_BLOCKED, Ticket::STATUS_BUG_BLOCKED, Ticket::STATUS_TASK_COMPLETED, Ticket::STATUS_FEATURE_COMPLETED, Ticket::STATUS_BUG_COMPLETED, Ticket::STATUS_REJECTED, Ticket::STATUS_NEXT_SPRINT]
                 : [],
             default => $ticket->isBug()
                 ? [Ticket::STATUS_BUG_PENDING, Ticket::STATUS_BUG_BLOCKED, Ticket::STATUS_BUG_COMPLETED, Ticket::STATUS_REJECTED]
-                : ($ticket->isFeature() ? [Ticket::STATUS_FEATURE_APPROVED, Ticket::STATUS_RECOMMENDED, Ticket::STATUS_NEXT_SPRINT, Ticket::STATUS_REJECTED] : [Ticket::STATUS_BACKLOG, Ticket::STATUS_IN_PROGRESS, Ticket::STATUS_FEATURE_BLOCKED, Ticket::STATUS_FEATURE_COMPLETED, Ticket::STATUS_REJECTED]),
+                : ($ticket->isFeature() ? [Ticket::STATUS_FEATURE_APPROVED, Ticket::STATUS_RECOMMENDED, Ticket::STATUS_NEXT_SPRINT, Ticket::STATUS_REJECTED] : [Ticket::STATUS_BACKLOG, Ticket::STATUS_IN_PROGRESS, Ticket::STATUS_TASK_BLOCKED, Ticket::STATUS_FEATURE_BLOCKED, Ticket::STATUS_TASK_COMPLETED, Ticket::STATUS_FEATURE_COMPLETED, Ticket::STATUS_REJECTED, Ticket::STATUS_NEXT_SPRINT]),
         };
     }
 
@@ -215,19 +215,19 @@ class KanbanService
     {
         return match ($column) {
             Ticket::STATUS_BACKLOG => $ticket->isBug() ? Ticket::STATUS_BUG_PENDING : ($ticket->isFeature() ? Ticket::STATUS_FEATURE_APPROVED : Ticket::STATUS_BACKLOG),
-            'blocked' => $ticket->isBug() ? Ticket::STATUS_BUG_BLOCKED : Ticket::STATUS_FEATURE_BLOCKED,
-            'completed' => $ticket->isBug() ? Ticket::STATUS_BUG_COMPLETED : Ticket::STATUS_FEATURE_COMPLETED,
+            'blocked' => $ticket->isBug() ? Ticket::STATUS_BUG_BLOCKED : ($ticket->isTask() ? Ticket::STATUS_TASK_BLOCKED : Ticket::STATUS_FEATURE_BLOCKED),
+            'completed' => $ticket->isBug() ? Ticket::STATUS_BUG_COMPLETED : ($ticket->isTask() ? Ticket::STATUS_TASK_COMPLETED : Ticket::STATUS_FEATURE_COMPLETED),
             default => $column,
         };
     }
 
     private function columnKeyForTicket(Ticket $ticket, string $view): string
     {
-        if ($view === self::VIEW_ALL) {
+        if (in_array($view, [self::VIEW_ALL, self::VIEW_SPRINT], true)) {
             return match ($ticket->status) {
                 Ticket::STATUS_BUG_PENDING, Ticket::STATUS_FEATURE_APPROVED, Ticket::STATUS_BACKLOG => Ticket::STATUS_BACKLOG,
-                Ticket::STATUS_BUG_BLOCKED, Ticket::STATUS_FEATURE_BLOCKED => 'blocked',
-                Ticket::STATUS_BUG_COMPLETED, Ticket::STATUS_FEATURE_COMPLETED => 'completed',
+                Ticket::STATUS_BUG_BLOCKED, Ticket::STATUS_FEATURE_BLOCKED, Ticket::STATUS_TASK_BLOCKED => 'blocked',
+                Ticket::STATUS_BUG_COMPLETED, Ticket::STATUS_FEATURE_COMPLETED, Ticket::STATUS_TASK_COMPLETED => 'completed',
                 default => $ticket->status,
             };
         }

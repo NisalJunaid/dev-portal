@@ -7,6 +7,7 @@ use App\Models\Software;
 use App\Models\Ticket;
 use App\Models\TicketComment;
 use App\Models\User;
+use App\Services\KanbanService;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
@@ -282,6 +283,36 @@ class QualityAssuranceFeatureTest extends TestCase
         $this->actingAs($developer)->get(route('reports.index'))->assertOk()->assertSee('Reports');
         $this->actingAs($developer)->get(route('dashboard'))->assertOk()->assertSee('Kiel global workspace');
         $this->actingAs($clientUser)->get(route('dashboard'))->assertOk()->assertSee($client->name);
+    }
+
+    public function test_task_completed_and_task_blocked_map_to_expected_list_and_kanban_payloads(): void
+    {
+        $this->seed(RoleSeeder::class);
+        [$client, $software, $clientUser] = $this->clientWorkspace();
+        $developer = $this->kielUser('developer');
+        $task = $this->ticket($client, $software, $clientUser, Ticket::TYPE_TASK, Ticket::STATUS_TASK_COMPLETED, 'Completed task');
+
+        $kanban = app(KanbanService::class);
+        $grouped = $kanban->groupedTickets($developer, KanbanService::VIEW_ALL);
+        $this->assertTrue($grouped->has('completed'));
+        $this->assertTrue($grouped->get('completed')->contains(fn (Ticket $t) => $t->id === $task->id));
+        $this->assertSame('completed', $kanban->ticketPayload($task, KanbanService::VIEW_ALL)['column']);
+
+        $this->actingAs($developer)
+            ->patchJson(route('tickets.inline-update', $task), ['field' => 'status', 'value' => Ticket::STATUS_TASK_COMPLETED])
+            ->assertOk()
+            ->assertJsonPath('ticket.list_section', 'completed')
+            ->assertJsonPath('ticket.column', 'completed');
+
+        $this->actingAs($developer)
+            ->patchJson(route('tickets.inline-update', $task), ['field' => 'status', 'value' => Ticket::STATUS_TASK_BLOCKED])
+            ->assertOk()
+            ->assertJsonPath('ticket.column', 'blocked');
+
+        $this->actingAs($developer)
+            ->patchJson(route('tickets.inline-update', $task), ['field' => 'status', 'value' => Ticket::STATUS_NEXT_SPRINT])
+            ->assertOk()
+            ->assertJsonPath('removed_from_tasks', true);
     }
 
     private function clientWorkspace(string $clientName = 'Client Co', string $email = 'client@example.test'): array
