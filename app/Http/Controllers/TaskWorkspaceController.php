@@ -102,7 +102,21 @@ class TaskWorkspaceController extends Controller
             $blocked = $currentSprint->tickets->filter(fn (Ticket $ticket) => $ticket->isBlocked())->count();
             $rejected = $currentSprint->tickets->where('status', Ticket::STATUS_REJECTED)->count();
             $remaining = $total - $completed - $rejected;
-            $currentSprintStats = ['total_tasks' => $total, 'completed_tasks' => $completed, 'incomplete_tasks' => $total - $completed, 'started_at' => $currentSprint->started_at, 'elapsed_seconds' => $currentSprint->elapsedSeconds(), 'timer_status' => $currentSprint->timer_status, 'backlog_tasks' => $backlog, 'in_progress_tasks' => $inProgress, 'blocked_tasks' => $blocked, 'rejected_tasks' => $rejected, 'remaining_tasks' => max(0, $remaining), 'can_end' => $currentSprint->canEnd()];
+            $currentSprintStats = [
+                'total_tasks' => $total,
+                'completed_tasks' => $completed,
+                'incomplete_tasks' => $total - $completed,
+                'backlog_tasks' => $backlog,
+                'in_progress_tasks' => $inProgress,
+                'blocked_tasks' => $blocked,
+                'rejected_tasks' => $rejected,
+                'remaining_tasks' => max(0, $remaining),
+                'active_count' => $currentSprint->activeItemsCount(),
+                'can_end' => $currentSprint->canEnd(),
+                'started_at' => $currentSprint->started_at,
+                'elapsed_seconds' => $currentSprint->elapsedSeconds(),
+                'timer_status' => $currentSprint->timer_status,
+            ];
         }
 
         return [

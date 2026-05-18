@@ -147,4 +147,20 @@ class Sprint extends Model
             $minutes > 0 ? $minutes.'m' : null,
         ])->filter()->join(' ') ?: 'Less than 1m';
     }
+
+    public function canEnd(): bool
+    {
+        $this->loadMissing('tickets');
+
+        return $this->tickets->every(fn (Ticket $ticket) => $ticket->isTerminalForSprint());
+    }
+
+    public function activeItemsCount(): int
+    {
+        $this->loadMissing('tickets');
+
+        return $this->tickets
+            ->filter(fn (Ticket $ticket) => ! $ticket->isTerminalForSprint())
+            ->count();
+    }
 }

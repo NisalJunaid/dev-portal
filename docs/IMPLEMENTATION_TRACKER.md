@@ -1,5 +1,23 @@
 # Implementation Tracker
 
+## Issue: `/tasks` crash on missing `Sprint::canEnd()`
+
+### Summary
+- fixed missing `Sprint::canEnd()` helper in `app/Models/Sprint.php` to enforce sprint end eligibility only when every sprint ticket is terminal.
+- added/verified `Sprint::activeItemsCount()` in `app/Models/Sprint.php` for shared active-item counting.
+- verified `Ticket::isTerminalForSprint()` and `Ticket::isActiveForSprint()` exist and include completed/rejected/blocked terminal statuses, including task-specific completed/blocked compatibility statuses.
+- aligned sprint-end rule usage between `TaskWorkspaceController` and `SprintController` to use shared Sprint helpers (`canEnd()` / `activeItemsCount()`), including `/tasks` current sprint strip stats and backend complete guard behavior.
+- fixed/normalized `TaskWorkspaceController` current sprint stats payload structure to include a complete valid array with timer/status fields and `active_count`/`can_end`.
+
+### Tests/checks run
+- `php artisan view:clear` *(failed in this container: missing `vendor/autoload.php`)*
+- `php artisan optimize:clear` *(failed in this container: missing `vendor/autoload.php`)*
+- `php artisan route:list` *(failed in this container: missing `vendor/autoload.php`)*
+- `php artisan test` *(failed in this container: missing `vendor/autoload.php`)*
+
+### Next planned task
+Production hardening and deployment preparation.
+
 ## Completed: Full QA pass and automated workflow coverage
 
 ### Summary
