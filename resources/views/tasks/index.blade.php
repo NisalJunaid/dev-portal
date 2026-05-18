@@ -91,7 +91,7 @@
                     <div class="flex items-center gap-2">
                         <button type="button" class="sprint-icon-button" title="Pause sprint" @click="pauseSprint({{ $currentSprint->id }})" x-show="('{{ $currentSprint->timer_status }}'==='running')"><svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><rect x="4" y="3" width="4" height="14"/><rect x="12" y="3" width="4" height="14"/></svg><span class="sr-only">Pause sprint</span></button>
                         <button type="button" class="sprint-icon-button" title="Resume sprint" @click="resumeSprint({{ $currentSprint->id }})" x-show="('{{ $currentSprint->timer_status }}'==='paused')"><svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><polygon points="5,3 17,10 5,17"/></svg><span class="sr-only">Resume sprint</span></button>
-                        <button type="button" class="sprint-icon-button" title="End sprint" @click="endSprint({{ $currentSprint->id }})" @disabled(!@js($currentSprintStats['can_end'] ?? false))><svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><rect x="4" y="4" width="12" height="12"/></svg><span class="sr-only">End sprint</span></button>
+                        <button type="button" class="sprint-icon-button" title="End sprint" @click="endSprint({{ $currentSprint->id }})" @disabled(!($currentSprintStats['can_end'] ?? false))><svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><rect x="4" y="4" width="12" height="12"/></svg><span class="sr-only">End sprint</span></button>
                     </div>
                     @endif
                 </section>

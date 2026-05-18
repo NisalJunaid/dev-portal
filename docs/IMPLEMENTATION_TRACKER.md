@@ -1,5 +1,23 @@
 # Implementation Tracker
 
+## Issue: invalid `js()` helper usage in Blade causing `/tasks` crash
+
+### Summary
+- issue: `/tasks` crashed with `Call to undefined function js()` due to an invalid Blade expression path that effectively invoked `js()` as a PHP helper.
+- fix: audited task/sprint Blade templates for invalid `js(` usage patterns and confirmed no lowercase `js()` helper invocations remain; corrected the problematic disable expression in Tasks toolbar to use a plain boolean expression instead of embedding `@js` inside `@disabled`.
+- files changed:
+  - `resources/views/tasks/index.blade.php`
+  - `docs/IMPLEMENTATION_TRACKER.md`
+
+### Tests/checks run
+- `rg -n "\bjs\(" resources/views`
+- `rg -n "\{\{\s*js\(|\{!!\s*js\(|<\?=\s*js\(" resources/views docs`
+- `php artisan view:clear`
+- `php artisan optimize:clear`
+
+### Next planned task
+Production hardening and deployment preparation.
+
 ## Issue: `/tasks` crash on missing `Sprint::canEnd()`
 
 ### Summary
