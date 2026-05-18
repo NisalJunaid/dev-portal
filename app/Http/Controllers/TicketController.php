@@ -443,12 +443,6 @@ class TicketController extends Controller
             ]);
         }
 
-        if ($field === 'status' && in_array($value, [Ticket::STATUS_BUG_BLOCKED, Ticket::STATUS_FEATURE_BLOCKED], true) && ! $ticket->isBlocked()) {
-            throw ValidationException::withMessages([
-                'status' => 'Use the Block button and provide a reason to block tickets.',
-            ]);
-        }
-
         if ($field === 'due_date' && $ticket->start_date && $value && $value < $ticket->start_date->toDateString()) {
             throw ValidationException::withMessages([
                 'due_date' => 'The due date must be after or equal to the start date.',
@@ -582,6 +576,7 @@ class TicketController extends Controller
 
         return [
             'id' => $ticket->id,
+            'ticket_no' => $ticket->ticket_no,
             'title' => $ticket->title,
             'description' => $ticket->description,
             'urgency' => $ticket->urgency,
@@ -596,11 +591,11 @@ class TicketController extends Controller
             'status' => $ticket->status,
             'status_label' => $ticket->formattedStatus(),
             'type' => $ticket->type,
-            'list_section' => $ticket->listSectionKey(),
+            'list_section' => $ticket->listSectionKey(request('work_type')),
             'column' => $this->kanbanService->ticketPayload($ticket, KanbanService::VIEW_ALL)['column'],
             'blocked' => $ticket->isBlocked(),
             'sprint_cycle' => $latestSprint ? '#'.$latestSprint->sprint_no.' '.$latestSprint->name : 'No sprint',
-            'updated_at' => $ticket->updated_at?->format('M j, Y g:i A'),
+            'updated_at' => $ticket->updated_at?->toISOString(),
         ];
     }
 

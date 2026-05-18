@@ -114,8 +114,13 @@ window.KielTasks = {
     isDirty(view) { return this.dirtyViews.has(view); },
 };
 
-const listSectionForTicket = (ticket = {}) => {
+const listSectionForTicket = (ticket = {}, workType = 'tasks') => {
     if (ticket.list_section) return ticket.list_section;
+    if (workType === 'bugs' || ticket.type === 'bug') {
+        if (ticket.status === 'bug_blocked') return 'blocked';
+        if (['bug_completed', 'rejected'].includes(ticket.status)) return 'completed';
+        return 'pending';
+    }
     if (['bug_completed', 'feature_completed', 'task_completed'].includes(ticket.status)) return 'completed';
     if (ticket.status === 'in_progress') return 'in_progress';
     return 'backlog';
@@ -363,14 +368,15 @@ window.KielTaskList = {
     statusOptionsForType,
     updateListRowFromPayload(row, ticket) {
         if (!row || !ticket) return;
-        const section = listSectionForTicket(ticket);
+        const workType = targetRow.closest('[data-list-board]')?.dataset.workType || 'tasks';
+        const section = listSectionForTicket(ticket, workType);
         row.dataset.currentStatus = ticket.status || row.dataset.currentStatus;
         row.dataset.currentSection = section;
         const statusLabel = row.querySelector('[data-list-status-label]');
         if (statusLabel && ticket.status_label) statusLabel.textContent = ticket.status_label;
         const title = row.querySelector('[data-list-title]');
         if (title && ticket.title) title.textContent = ticket.title;
-        const assignee = row.querySelector('[data-list-assignee]');
+        const assignee = row.querySelector('[data-list-assignee-label]') || row.querySelector('[data-list-assignee]');
         if (assignee) assignee.textContent = ticket.assignee_name || ticket.assignee?.name || 'Unassigned';
         const ticketNo = row.querySelector('[data-list-ticket-no]');
         if (ticketNo && ticket.ticket_no) ticketNo.textContent = ticket.ticket_no;
@@ -404,7 +410,8 @@ window.KielTaskList = {
     applyTicketUpdate(ticket, row = null) {
         const targetRow = row || document.querySelector(`[data-list-task-row][data-ticket-id="${ticket?.id}"]`);
         if (!targetRow || !ticket) return;
-        const section = listSectionForTicket(ticket);
+        const workType = row.closest('[data-list-board]')?.dataset.workType || 'tasks';
+        const section = listSectionForTicket(ticket, workType);
         this.moveRowToSection(targetRow, section);
         this.updateListRowFromPayload(targetRow, ticket);
         this.updateCounts();
@@ -430,8 +437,10 @@ window.KielTaskList = {
                     const from = evt.from.dataset.section;
                     const previousIndex = evt.oldIndex;
                     if (to === from) return;
-                    const type = row.dataset.ticketType;
-                    const status = to === 'in_progress' ? 'in_progress' : (to === 'completed' ? (type === 'bug' ? 'bug_completed' : 'task_completed') : 'backlog');
+                    const workType = row.closest('[data-list-board]')?.dataset.workType || 'tasks';
+                    let status = 'backlog';
+                    if (row.dataset.ticketType === 'bug' || workType === 'bugs') status = to === 'blocked' ? 'bug_blocked' : (to === 'completed' ? 'bug_completed' : 'bug_pending');
+                    else status = to === 'in_progress' ? 'in_progress' : (to === 'completed' ? (window.KielTaskStatuses?.taskCompleted || 'task_completed') : 'backlog');
                     try {
                         const payload = await window.Kiel.request(row.dataset.moveUrl, { method: 'PATCH', body: JSON.stringify({ field: 'status', value: status }) });
                         if (payload.removed_from_tasks) {
@@ -440,7 +449,7 @@ window.KielTaskList = {
                             window.KielTasks.emitRemoved(payload.ticket.id, 'moved_to_next_sprint');
                             return;
                         }
-                        const newSection = listSectionForTicket(payload.ticket || {});
+                        const newSection = listSectionForTicket(payload.ticket || {}, workType);
                         this.moveRowToSection(row, newSection, evt.newIndex ?? null);
                         this.updateListRowFromPayload(row, payload.ticket);
                         this.updateCounts();
@@ -461,7 +470,8 @@ window.addEventListener('kiel:task-updated', (event) => {
     if (!ticket?.id) return;
     document.querySelectorAll(`[data-list-task-row][data-ticket-id="${ticket.id}"]`).forEach((row) => {
         if (ticket.removed_from_tasks) { row.remove(); return; }
-        const section = listSectionForTicket(ticket);
+        const workType = row.closest('[data-list-board]')?.dataset.workType || 'tasks';
+        const section = listSectionForTicket(ticket, workType);
         window.KielTaskList.moveRowToSection(row, section);
         window.KielTaskList.updateListRowFromPayload(row, ticket);
     });
@@ -479,19 +489,3 @@ window.addEventListener('kiel:task-removed', (event) => {
 });
 
 
-const closeAllStatusMenus = () => document.querySelectorAll('[data-list-status-menu]').forEach((m)=>m.remove());
-document.addEventListener('click', (e)=> { if (!e.target.closest('[data-list-status-trigger]') && !e.target.closest('[data-list-status-menu]')) closeAllStatusMenus(); });
-document.addEventListener('keydown', (e)=> { if (e.key === 'Escape') closeAllStatusMenus(); });
-document.addEventListener('click', async (event) => {
-    const trigger = event.target.closest('[data-list-status-trigger]');
-    if (!trigger || document.body.classList.contains('is-task-list-dragging')) return;
-    event.preventDefault(); event.stopPropagation();
-    const row = trigger.closest('[data-list-task-row]'); if (!row) return;
-    const cell = trigger.closest('td'); if (!cell) return;
-    const existing = cell.querySelector('[data-list-status-menu]'); closeAllStatusMenus(); if (existing) return;
-    const menu = document.createElement('div');
-    menu.className = 'absolute left-0 top-full z-[80] mt-1 w-56 rounded-xl border border-slate-200 bg-white py-1 shadow-xl';
-    menu.setAttribute('data-list-status-menu','1');
-    statusOptionsForType(row.dataset.ticketType).forEach((opt)=>{ const btn=document.createElement('button'); btn.type='button'; btn.className='flex w-full items-center justify-between px-3 py-1.5 text-left text-xs hover:bg-slate-50'; btn.innerHTML=`<span>${opt.label}</span>`; btn.addEventListener('click', async (ev)=>{ev.preventDefault(); ev.stopPropagation(); if(opt.value===row.dataset.currentStatus){closeAllStatusMenus(); return;} try{const payload=await window.Kiel.request(row.dataset.moveUrl,{method:'PATCH',body:JSON.stringify({field:'status', value:opt.value})}); if(payload.removed_from_tasks){row.remove();window.KielTaskList.updateCounts();window.KielTasks.emitRemoved(payload.ticket.id,'moved_to_next_sprint'); window.KielTasks.markDirty('sprints'); if(payload.feature){window.dispatchEvent(new CustomEvent('kiel:feature-request-updated',{detail:{feature:payload.feature}}));} window.Kiel.toast(payload.message || 'Moved back to feature requests for next sprint.'); return;} window.KielTaskList.applyTicketUpdate(payload.ticket,row); window.KielTasks.emitTaskUpdated(payload.ticket); window.Kiel.toast(payload.message||'Status updated.');}catch(err){window.Kiel.toast(err.message||'Unable to update status.','error');} finally {closeAllStatusMenus();}}); menu.appendChild(btn); });
-    cell.appendChild(menu);
-});

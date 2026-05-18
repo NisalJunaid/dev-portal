@@ -40,9 +40,11 @@ class TaskWorkspaceController extends Controller
 
         return response()->json([
             'html' => view($partial, $partial === 'tasks.partials.kanban-view'
-                ? ['activeView' => 'all', 'columns' => $data['kanbanColumns'], 'ticketsByColumn' => $data['kanbanTicketsByColumn'], 'canMove' => $data['canMove']]
-: ['tickets' => $data['tickets'], 'sort' => $data['sort'], 'direction' => $data['direction'], 'teamMembers' => $data['teamMembers'], 'isKielUser' => $data['isKielUser'], 'listSections' => $data['listSections']]
+                ? ['activeView' => 'all', 'columns' => $data['kanbanColumns'], 'ticketsByColumn' => $data['kanbanTicketsByColumn'], 'canMove' => $data['canMove'], 'workType' => $data['workType']]
+: ['tickets' => $data['tickets'], 'sort' => $data['sort'], 'direction' => $data['direction'], 'teamMembers' => $data['teamMembers'], 'isKielUser' => $data['isKielUser'], 'listSections' => $data['listSections'], 'workType' => $data['workType']]
             )->render(),
+            'board_columns' => collect($data['kanbanColumns'])->map(fn ($label, $key) => ['key' => $key, 'label' => $label])->values(),
+            'work_type' => $data['workType'],
         ]);
     }
 
@@ -128,7 +130,7 @@ class TaskWorkspaceController extends Controller
             'filters' => array_merge($filters, ['scope' => $selectedScope, 'sprint_id' => $selectedSprintId]), 'sort' => $sort, 'direction' => $direction, 'canEditTimeline' => $this->timelineService->canEdit($request->user()),
             'workType' => $workType,
             'assignees' => User::query()->orderBy('name')->get(['id', 'name']), 'urgencies' => Ticket::URGENCIES, 'statuses' => array_values(array_filter(Ticket::STATUSES, fn ($status) => $status !== Ticket::STATUS_FEATURE_APPROVED && $status !== Ticket::STATUS_RECOMMENDED && $status !== Ticket::STATUS_NEXT_SPRINT)),
-            'sprints' => Sprint::query()->latest('id')->get(['id', 'name', 'sprint_no']), 'listSections' => Ticket::listSections(), 'kanbanColumns' => $this->kanbanService->columnsForWorkType($workType),
+            'sprints' => Sprint::query()->latest('id')->get(['id', 'name', 'sprint_no']), 'listSections' => Ticket::listSections($workType), 'kanbanColumns' => $this->kanbanService->columnsForWorkType($workType),
             'kanbanTicketsByColumn' => $this->kanbanService->groupedTickets($request->user(), KanbanService::VIEW_ALL, ['scope' => $selectedScope, 'sprint_id' => $selectedSprintId, 'current_sprint_ids' => $currentSprintIds, 'work_type' => $workType] + $validated), 'canMove' => $request->user()->isKielUser() || $request->user()->isClientUser(), 'currentSprint' => $currentSprint, 'activeSprints' => $activeSprints, 'currentSprintStats' => $currentSprintStats, 'currentSprintIds' => $currentSprintIds, 'selectedScope' => $selectedScope, 'selectedSprintId' => $selectedSprintId,
         ];
     }

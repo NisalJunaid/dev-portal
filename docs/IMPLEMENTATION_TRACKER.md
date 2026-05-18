@@ -709,3 +709,25 @@ Production hardening and deployment preparation.
 
 ### Next planned task
 Production hardening and deployment preparation.
+
+## Completed: Tasks/Bugs workspace dropdown + bug drag/drop + live board switching
+
+### Summary
+- Replaced clipped in-cell status menu with a fixed global floating field menu in the Tasks workspace shell.
+- Added assignee floating dropdown support in list rows for both Tasks and Bugs.
+- Updated list grouping/mapping for `work_type` so Bugs use `pending/blocked/completed` and Tasks use `backlog/in_progress/completed`.
+- Fixed Bugs list drag/drop status mapping (`bug_pending`, `bug_blocked`, `bug_completed`) and live row updates.
+- Updated `tasks.partial` JSON to include `board_columns` and `work_type`, and wired board column store refresh on partial reload.
+- Relaxed inline blocked-status restriction for direct list/board operational moves (no block-reason hard stop).
+
+### Tests/checks run
+- `php artisan test`
+- `php artisan route:list`
+- `php artisan view:clear`
+- `php artisan optimize:clear`
+
+### Known issues
+- None newly identified beyond existing environment dependency constraints.
+
+### Next planned task
+Production hardening and deployment preparation.

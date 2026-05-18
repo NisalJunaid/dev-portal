@@ -251,3 +251,5 @@ body.is-task-list-dragging * {
 [data-list-drag-handle]:active {
     cursor: grabbing;
 }
+
+.field-floating-menu{z-index:130;}
