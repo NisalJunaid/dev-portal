@@ -75,7 +75,11 @@ class KanbanService
         };
 
         $workType = $filters['work_type'] ?? null;
-        if ($workType === 'bugs') {
+        if ($workType === 'triage') {
+            $query->where(function ($q) {
+                $q->whereNull('type')->orWhere('status', Ticket::STATUS_TRIAGE_PENDING);
+            });
+        } elseif ($workType === 'bugs') {
             $query->where('type', Ticket::TYPE_BUG);
         } elseif ($workType === 'tasks') {
             $query->where(function ($q) {
@@ -86,7 +90,7 @@ class KanbanService
         $scope = $filters['scope'] ?? 'current_sprint';
         $sprintId = $filters['sprint_id'] ?? null;
         $currentSprintIds = $filters['current_sprint_ids'] ?? [];
-        if ($scope === 'current_sprint') {
+        if ($scope === 'current_sprint' && $workType !== 'triage') {
             $query->whereHas('sprints', fn ($s) => $s->whereIn('sprints.id', ! empty($currentSprintIds) ? $currentSprintIds : [0]));
         } elseif ($scope === 'unsprinted') {
             $query->whereDoesntHave('sprints');
@@ -111,9 +115,11 @@ class KanbanService
 
     public function columnsForWorkType(string $workType): array
     {
-        return $workType === 'bugs'
-            ? [Ticket::STATUS_BUG_PENDING => 'Pending', 'blocked' => 'Blocked', 'completed' => 'Completed', Ticket::STATUS_REJECTED => 'Rejected']
-            : [Ticket::STATUS_BACKLOG => 'Backlog', Ticket::STATUS_IN_PROGRESS => 'In Progress', 'blocked' => 'Blocked', 'completed' => 'Completed', Ticket::STATUS_REJECTED => 'Rejected', Ticket::STATUS_NEXT_SPRINT => 'Next Sprint'];
+        return match ($workType) {
+            'triage' => ['pending' => 'Pending Review'],
+            'bugs' => [Ticket::STATUS_BUG_PENDING => 'Pending', 'blocked' => 'Blocked', 'completed' => 'Completed', Ticket::STATUS_REJECTED => 'Rejected'],
+            default => [Ticket::STATUS_BACKLOG => 'Backlog', Ticket::STATUS_IN_PROGRESS => 'In Progress', 'blocked' => 'Blocked', 'completed' => 'Completed', Ticket::STATUS_REJECTED => 'Rejected', Ticket::STATUS_NEXT_SPRINT => 'Next Sprint'],
+        };
     }
 
     public function moveTicket(Ticket $ticket, User $user, string $column, int $position, string $view): array

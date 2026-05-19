@@ -7,10 +7,13 @@
                 <button type="button" class="rounded-lg p-2 text-slate-500 hover:bg-slate-100" @click="closeCreateTaskDrawer()">✕</button>
             </div>
             <form class="flex-1 overflow-y-auto p-5 space-y-4" @submit.prevent="submitCreateTask">
-                <label class="flex items-start gap-3 rounded-xl border border-slate-200 p-3">
+                <p class="rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-2 text-xs text-indigo-700">Your request will go to Triage for Kiel review.</p><label class="flex items-start gap-3 rounded-xl border border-slate-200 p-3">
                     <input type="checkbox" class="mt-1 rounded border-slate-300 text-indigo-600" x-model="createTaskForm.is_bug" @change="createTaskForm.type = createTaskForm.is_bug ? 'bug' : 'task'">
                     <span><span class="block text-sm font-semibold text-slate-800">Bug</span><span class="block text-xs text-slate-500">Track this as a bug instead of a task.</span><span x-show="createTaskForm.is_bug" class="mt-1 block text-xs text-indigo-600">Bugs start in Pending.</span></span>
                 </label>
+                @if ($isKielUser)
+                    <label class="flex items-center gap-2 text-xs text-slate-600"><input type="checkbox" class="rounded border-slate-300 text-indigo-600" x-model="createTaskForm.send_to_triage">Send to Triage first</label>
+                @endif
                 <template x-if="createTaskErrors.global"><p class="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700" x-text="createTaskErrors.global"></p></template>
                 <label class="block text-sm font-semibold text-slate-700">Title
                     <input x-model="createTaskForm.title" data-create-task-title type="text" class="mt-1 w-full rounded-xl border-slate-200 text-sm" required>

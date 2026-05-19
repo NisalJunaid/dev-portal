@@ -337,3 +337,6 @@ body.is-task-list-dragging * {
 .drawer-icon-button:hover { background:rgb(248 250 252); color:rgb(79 70 229); border-color:rgb(199 210 254); }
 .drawer-icon-button-danger:hover { color:rgb(225 29 72); border-color:rgb(254 205 211); }
 .drawer-section { border-bottom:1px solid rgb(226 232 240); background:white; padding:1.25rem 1.5rem; }
+
+.app-shell.is-sidebar-collapsed .sidebar-label { display:none; }
+

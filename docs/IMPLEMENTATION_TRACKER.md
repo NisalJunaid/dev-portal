@@ -885,3 +885,43 @@ Production hardening and deployment preparation.
 
 ### Next planned task
 Production hardening and deployment preparation.
+
+## Completed: Triage workflow + Sprints feature drawer + sidebar collapse/resize stabilization
+
+### Summary
+- fixed Sprints feature request drawer Alpine state and submit flow (`createFeatureErrors`, `createFeatureSubmitting`, reset/focus handling, and robust validation display state).
+- updated feature request drawer partial with global + field validation messages, SVG close icon, and slide-in drawer transitions.
+- added Tasks workspace `work_type` support for `triage|tasks|bugs` with default `triage` and tab order `Triage, Tasks, Bugs`.
+- implemented triage model semantics: `triage_pending` status constant and `Ticket::isTriage()` helper; triage list sections now use `Pending Review`.
+- enabled client intake submission through Add New into triage (`type = null`, `requested_type`, `status = triage_pending`) and kept Kiel direct create path intact unless sent to triage.
+- added Kiel classify JSON workflow (`PATCH /tickets/{ticket}/classify`) to convert triage into task/bug and optionally attach to current sprint.
+- triage list reuses the existing tasks list UI/UX pipeline.
+- feature requests remain separate on Sprints page (`features.request.store` unchanged).
+- sidebar nav default Tasks route now opens triage, and collapsed-label behavior stabilized with shell collapsed class.
+
+### Files changed
+- `resources/views/sprints/index.blade.php`
+- `resources/views/tasks/partials/create-feature-drawer.blade.php`
+- `resources/views/tasks/index.blade.php`
+- `resources/views/tasks/partials/create-task-drawer.blade.php`
+- `app/Http/Controllers/TaskWorkspaceController.php`
+- `app/Http/Controllers/TicketController.php`
+- `app/Models/Ticket.php`
+- `app/Services/KanbanService.php`
+- `resources/views/components/app-layout.blade.php`
+- `resources/css/app.css`
+- `database/migrations/2026_05_19_000001_add_triage_fields_to_tickets_table.php`
+- `docs/IMPLEMENTATION_TRACKER.md`
+
+### Tests/checks run
+- `php artisan migrate` *(failed: missing `vendor/autoload.php` in this container)*
+- `php artisan test` *(failed: missing `vendor/autoload.php` in this container)*
+- `php artisan route:list` *(failed: missing `vendor/autoload.php` in this container)*
+- `php artisan view:clear` *(failed: missing `vendor/autoload.php` in this container)*
+- `php artisan optimize:clear` *(failed: missing `vendor/autoload.php` in this container)*
+
+### Known issues
+- Local container is missing Composer `vendor/` dependencies, so Laravel artisan and test execution cannot run until dependencies are installed.
+
+### Next planned task
+Production hardening and deployment preparation.

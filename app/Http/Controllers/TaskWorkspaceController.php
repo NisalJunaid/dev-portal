@@ -52,7 +52,7 @@ class TaskWorkspaceController extends Controller
     {
         $validated = $request->validate([
             'view' => ['nullable', 'string'], 'search' => ['nullable', 'string', 'max:255'],
-            'work_type' => ['nullable', Rule::in(['tasks', 'bugs'])],
+            'work_type' => ['nullable', Rule::in(['triage', 'tasks', 'bugs'])],
             'urgency' => ['nullable', Rule::in(Ticket::URGENCIES)], 'status' => ['nullable', Rule::in(Ticket::STATUSES)], 'assigned_to' => ['nullable', 'string'],
             'client_id' => ['nullable', 'integer', Rule::exists('clients', 'id')], 'software_id' => ['nullable', 'integer', Rule::exists('softwares', 'id')],
             'blocked' => ['nullable', Rule::in(['yes', 'no'])], 'sort' => ['nullable', Rule::in(['ticket_no', 'title', 'type', 'urgency', 'status', 'assigned_to', 'client', 'software', 'start_date', 'due_date', 'sprint', 'blocked', 'updated_at'])],
@@ -63,7 +63,7 @@ class TaskWorkspaceController extends Controller
         $sort = $validated['sort'] ?? 'updated_at'; $direction = $validated['direction'] ?? 'desc';
         $selectedScope = $validated['scope'] ?? 'current_sprint';
         $selectedSprintId = $validated['sprint_id'] ?? null;
-        $workType = $validated['work_type'] ?? 'tasks';
+        $workType = $validated['work_type'] ?? 'triage';
         $requestedView = $validated['view'] ?? 'list';
         $activeView = in_array($requestedView, ['list', 'board', 'timeline'], true) ? $requestedView : 'list';
         $filters = array_merge(['view' => $activeView, 'scope' => $selectedScope, 'work_type' => $workType], $validated);
@@ -81,14 +81,18 @@ class TaskWorkspaceController extends Controller
 
         $tickets = Ticket::query()->visibleTo($request->user())->notArchived()->with(['client', 'software', 'submitter', 'assignee', 'sprints', 'parent', 'children', 'children.assignee', 'children.client', 'children.software', 'children.sprints'])->withExists(['activeBlock as is_blocked'])
             ->when($validated['search'] ?? null, fn ($q, string $search) => $q->where(fn ($q) => $q->where('ticket_no', 'like', '%'.$search.'%')->orWhere('title', 'like', '%'.$search.'%')))
-            ->where('type', $workType === 'bugs' ? Ticket::TYPE_BUG : Ticket::TYPE_TASK)
+            ->when($workType === 'triage', fn ($q) => $q->where(function ($inner) {
+                $inner->whereNull('type')->orWhere('status', Ticket::STATUS_TRIAGE_PENDING);
+            }))
+            ->when($workType === 'bugs', fn ($q) => $q->where('type', Ticket::TYPE_BUG))
+            ->when($workType === 'tasks', fn ($q) => $q->where('type', Ticket::TYPE_TASK))
             ->when($validated['urgency'] ?? null, fn ($q, string $urgency) => $q->where('urgency', $urgency))
             ->when($validated['status'] ?? null, fn ($q, string $status) => $q->where('status', $status))
             ->when(($validated['assigned_to'] ?? null) === 'unassigned', fn ($q) => $q->whereNull('assigned_to'))
             ->when(($validated['assigned_to'] ?? null) && ($validated['assigned_to'] ?? null) !== 'unassigned', fn ($q) => $q->where('assigned_to', $validated['assigned_to']))
             ->when(($validated['client_id'] ?? null) && $request->user()->isKielUser(), fn ($q, int $clientId) => $q->where('client_id', $clientId))
             ->when($validated['software_id'] ?? null, fn ($q, int $softwareId) => $q->where('software_id', $softwareId))
-            ->when($selectedScope === 'current_sprint', fn ($q) => $q->whereHas('sprints', fn ($s) => $s->whereIn('sprints.id', $currentSprintIds ?: [0])))
+            ->when($selectedScope === 'current_sprint' && $workType !== 'triage', fn ($q) => $q->whereHas('sprints', fn ($s) => $s->whereIn('sprints.id', $currentSprintIds ?: [0])))
             ->when($selectedScope === 'unsprinted', fn ($q) => $q->whereDoesntHave('sprints'))
             ->when($selectedScope === 'completed_sprints', fn ($q) => $q->whereHas('sprints', fn ($s) => $s->where('status', Sprint::STATUS_COMPLETED)))
             ->when($selectedScope === 'sprint' && $selectedSprintId, fn ($q) => $q->whereHas('sprints', fn ($s) => $s->where('sprints.id', $selectedSprintId)))
