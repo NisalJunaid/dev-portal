@@ -8,7 +8,7 @@
 
     $menuItems = [
         ['label' => 'Dashboard', 'route' => 'dashboard', 'permission' => null, 'icon' => 'D', 'active' => request()->routeIs('dashboard')],
-        ['label' => 'Tasks', 'route' => 'tasks.index', 'permission' => 'view tickets', 'icon' => 'T', 'active' => $tasksActive],
+        ['label' => 'Tasks', 'route' => 'tasks.index', 'params' => ['work_type' => 'triage'], 'permission' => 'view tickets', 'icon' => 'T', 'active' => $tasksActive],
         ['label' => 'Sprints', 'route' => 'sprints.index', 'permission' => 'view sprints', 'icon' => 'S', 'active' => request()->routeIs('sprints.*')],
         ['label' => 'Reports', 'route' => 'reports.index', 'permission' => 'view reports', 'icon' => 'R', 'active' => request()->routeIs('reports.*')],
         ['label' => 'Clients', 'route' => 'clients.index', 'permission' => 'view clients', 'icon' => 'C', 'active' => request()->routeIs('clients.*')],
@@ -29,7 +29,7 @@
     <div
         x-data="appShell()"
         x-init="initShell()"
-        class="min-h-screen bg-slate-50 app-shell"
+        class="min-h-screen bg-slate-50 app-shell" :class="{ 'is-sidebar-collapsed': sidebarCollapsed }"
         style="--sidebar-width: 288px; --content-left: 288px;"
     >
         <div x-cloak x-show="pageLeaving" x-transition.opacity.duration.120ms class="fixed inset-0 z-[200] pointer-events-none bg-slate-50/60 backdrop-blur-[1px]"></div>
@@ -58,9 +58,9 @@
             <nav class="mt-8 space-y-1">
                 @foreach ($menuItems as $item)
                     @if ($item['permission'] === null || auth()->user()->can($item['permission']))
-                        <a href="{{ route($item['route']) }}" data-app-nav-link @click="handleNavClick($event)" @class(['app-shell-link', 'app-shell-link-active' => $item['active']])>
+                        <a href="{{ route($item['route'], $item['params'] ?? []) }}" data-app-nav-link @click="handleNavClick($event)" @class(['app-shell-link', 'app-shell-link-active' => $item['active']])>
                             <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-slate-200/80 text-xs font-black text-slate-500">{{ $item['icon'] }}</span>
-                            <span x-show="!sidebarCollapsed" x-transition.opacity>{{ $item['label'] }}</span>
+                            <span class="sidebar-label" x-show="!sidebarCollapsed" x-transition.opacity>{{ $item['label'] }}</span>
                         </a>
                     @endif
                 @endforeach

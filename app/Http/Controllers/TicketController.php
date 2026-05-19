@@ -140,7 +140,10 @@ class TicketController extends Controller
             'description' => ['required', 'string', 'max:10000'],
             'software_id' => ['nullable', Rule::exists('softwares', 'id')->where('is_enabled', true)],
             'urgency' => ['required', Rule::in(Ticket::URGENCIES)],
-            'type' => ['required', Rule::in([Ticket::TYPE_TASK, Ticket::TYPE_BUG])],
+            'type' => ['nullable', Rule::in([Ticket::TYPE_TASK, Ticket::TYPE_BUG])],
+            'requested_type' => ['nullable', Rule::in([Ticket::TYPE_TASK, Ticket::TYPE_BUG])],
+            'work_type' => ['nullable', Rule::in(['triage', 'tasks', 'bugs'])],
+            'send_to_triage' => ['nullable', 'boolean'],
             'parent_ticket_id' => ['nullable', Rule::exists('tickets', 'id')],
             'assigned_to' => ['nullable', Rule::exists('users', 'id')],
             'start_date' => ['nullable', 'date'],
@@ -163,14 +166,16 @@ class TicketController extends Controller
             : Software::with('client')->findOrFail($validated['software_id']);
         abort_unless($request->user()->canAccessClient($software->client), 403);
 
-        $type = $parentTicket ? Ticket::TYPE_TASK : $validated['type'];
+        $requestedType = $validated['requested_type'] ?? $validated['type'] ?? Ticket::TYPE_TASK;
+        $sendToTriage = ! $request->user()->isKielUser() || (($validated['work_type'] ?? null) === 'triage') || (bool) ($validated['send_to_triage'] ?? false);
+        $type = $sendToTriage ? null : ($parentTicket ? Ticket::TYPE_TASK : $requestedType);
         $isTask = $type === Ticket::TYPE_TASK;
         $isBug = $type === Ticket::TYPE_BUG;
-        if ($isTask || $isBug) {
+        if (($isTask || $isBug) && ! $sendToTriage) {
             abort_unless($request->user()->isKielUser(), 403);
         }
 
-        [$ticket, $activeSprint] = DB::transaction(function () use ($request, $validated, $software, $isTask, $isBug, $type, $parentTicket) {
+        [$ticket, $activeSprint, $sendToTriage] = DB::transaction(function () use ($request, $validated, $software, $isTask, $isBug, $type, $parentTicket, $requestedType, $sendToTriage) {
             $ticket = Ticket::create([
                 'client_id' => $parentTicket?->client_id ?? $software->client_id,
                 'software_id' => $parentTicket?->software_id ?? $software->id,
@@ -180,7 +185,8 @@ class TicketController extends Controller
                 'description' => $validated['description'],
                 'urgency' => $validated['urgency'] ?? ($parentTicket?->urgency ?? 'medium'),
                 'type' => $type,
-                'status' => $isBug ? Ticket::STATUS_BUG_PENDING : Ticket::STATUS_BACKLOG,
+                'requested_type' => $sendToTriage ? $requestedType : null,
+                'status' => $sendToTriage ? Ticket::STATUS_TRIAGE_PENDING : ($isBug ? Ticket::STATUS_BUG_PENDING : Ticket::STATUS_BACKLOG),
                 'submitted_at' => now(),
                 'parent_ticket_id' => $parentTicket?->id,
                 'assigned_to' => $isTask ? ($validated['assigned_to'] ?? null) : null,
@@ -197,13 +203,13 @@ class TicketController extends Controller
                 ->latest('started_at')
                 ->first();
 
-            if ($activeSprint) {
+            if ($activeSprint && ! $sendToTriage) {
                 $nextPosition = (int) $activeSprint->items()->max('position') + 1;
                 $activeSprint->items()->create(['ticket_id' => $ticket->id, 'position' => $nextPosition]);
                 $this->ticketActivityService->log($ticket, 'sprint linked', 'Added to current sprint.', $request->user());
             }
 
-            return [$ticket, $activeSprint];
+            return [$ticket, $activeSprint, $sendToTriage];
         });
 
         if ($request->expectsJson()) {
@@ -213,7 +219,7 @@ class TicketController extends Controller
                 'message' => $ticket->ticket_no.' created successfully.',
                 'ticket' => $this->inlineTicketPayload($ticket),
                 'drawer_url' => route('tickets.drawer', $ticket),
-                'work_type' => $ticket->type === Ticket::TYPE_BUG ? 'bugs' : 'tasks',
+                'work_type' => $sendToTriage ? 'triage' : ($ticket->type === Ticket::TYPE_BUG ? 'bugs' : 'tasks'),
                 'attached_to_current_sprint' => $activeSprint !== null,
                 'sprint_id' => $activeSprint?->id,
             ], 201);
@@ -287,35 +293,46 @@ class TicketController extends Controller
         ]);
     }
 
-    public function classify(Request $request, Ticket $ticket): RedirectResponse
+    public function classify(Request $request, Ticket $ticket): JsonResponse
     {
         $this->authorizeKielTicketAccess($request, $ticket);
 
         $validated = $request->validate([
-            'type' => ['required', Rule::in(Ticket::TYPES)],
+            'type' => ['required', Rule::in([Ticket::TYPE_TASK, Ticket::TYPE_BUG])],
+            'status' => ['nullable', Rule::in(Ticket::STATUSES)],
+            'assigned_to' => ['nullable', Rule::exists('users', 'id')],
+            'attach_to_current_sprint' => ['nullable', 'boolean'],
         ]);
 
-        $oldType = $ticket->type;
-        $oldStatus = $ticket->status;
-        $newStatus = $validated['type'] === Ticket::TYPE_BUG ? Ticket::STATUS_BUG_PENDING : Ticket::STATUS_FEATURE_APPROVED;
+        $newType = $validated['type'];
+        $newStatus = $validated['status'] ?? ($newType === Ticket::TYPE_BUG ? Ticket::STATUS_BUG_PENDING : Ticket::STATUS_BACKLOG);
 
         $ticket->update([
-            'type' => $validated['type'],
+            'type' => $newType,
+            'requested_type' => null,
             'status' => $newStatus,
-            'rejection_reason' => null,
             'classified_at' => now(),
+            'assigned_to' => $validated['assigned_to'] ?? $ticket->assigned_to,
         ]);
 
-        $this->ticketActivityService->log($ticket, 'classified', 'Ticket classified as '.str($validated['type'])->headline().'.', $request->user(), $oldType, $validated['type']);
-
-        if ($oldStatus !== $newStatus) {
-            $this->ticketActivityService->log($ticket, 'status changed', 'Ticket status changed during classification.', $request->user(), $oldStatus, $newStatus);
+        if (($validated['attach_to_current_sprint'] ?? false) && $ticket->client_id) {
+            $activeSprint = Sprint::query()->where('client_id', $ticket->client_id)->where('status', Sprint::STATUS_IN_PROGRESS)->latest('started_at')->first();
+            if ($activeSprint && ! $activeSprint->tickets()->whereKey($ticket->id)->exists()) {
+                $activeSprint->items()->create(['ticket_id' => $ticket->id, 'position' => ((int) $activeSprint->items()->max('position')) + 1]);
+            }
         }
 
-        return back()->with('status', 'Ticket classified successfully.');
+        $this->ticketActivityService->log($ticket, 'classified', 'Classified as '.str($newType)->headline().'.', $request->user());
+
+        return response()->json([
+            'message' => 'Ticket classified successfully.',
+            'ticket' => $this->inlineTicketPayload($ticket->fresh(['client', 'software', 'assignee', 'sprints'])),
+            'work_type' => $newType === Ticket::TYPE_BUG ? 'bugs' : 'tasks',
+            'removed_from_triage' => true,
+        ]);
     }
 
-    public function reject(Request $request, Ticket $ticket): RedirectResponse
+public function reject(Request $request, Ticket $ticket): RedirectResponse
     {
         $this->authorizeKielTicketAccess($request, $ticket);
 

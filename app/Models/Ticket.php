@@ -27,6 +27,7 @@ class Ticket extends Model
     public const STATUS_FEATURE_BLOCKED = 'feature_blocked';
     public const STATUS_FEATURE_COMPLETED = 'feature_completed';
     public const STATUS_REJECTED = 'rejected';
+    public const STATUS_TRIAGE_PENDING = 'triage_pending';
 
     public const TYPE_BUG = 'bug';
     public const TYPE_FEATURE = 'feature';
@@ -53,6 +54,7 @@ class Ticket extends Model
         self::STATUS_FEATURE_BLOCKED,
         self::STATUS_FEATURE_COMPLETED,
         self::STATUS_REJECTED,
+        self::STATUS_TRIAGE_PENDING,
     ];
 
     protected $fillable = [
@@ -85,6 +87,7 @@ class Ticket extends Model
         'archived_reason',
         'returned_to_sprint_at',
         'returned_from_task_id',
+        'requested_type',
     ];
 
     protected $casts = [
@@ -297,6 +300,10 @@ class Ticket extends Model
 
     public function listSectionKey(?string $workType = null): string
     {
+        if ($workType === 'triage') {
+            return 'pending';
+        }
+
         if ($workType === 'bugs' || $this->isBug()) {
             return match ($this->status) {
                 self::STATUS_BUG_BLOCKED => 'blocked',
@@ -312,9 +319,11 @@ class Ticket extends Model
 
     public static function listSections(string $workType = 'tasks'): array
     {
-        return $workType === 'bugs'
-            ? ['pending' => 'Pending', 'blocked' => 'Blocked', 'completed' => 'Completed']
-            : ['backlog' => 'Backlog', 'in_progress' => 'In Progress', 'completed' => 'Completed'];
+        return match ($workType) {
+            'triage' => ['pending' => 'Pending Review'],
+            'bugs' => ['pending' => 'Pending', 'blocked' => 'Blocked', 'completed' => 'Completed'],
+            default => ['backlog' => 'Backlog', 'in_progress' => 'In Progress', 'completed' => 'Completed'],
+        };
     }
 
     public static function statusForListSection(self $ticket, string $section): string
@@ -326,6 +335,11 @@ class Ticket extends Model
         };
     }
 
+
+    public function isTriage(): bool
+    {
+        return $this->type === null || $this->status === self::STATUS_TRIAGE_PENDING;
+    }
     public function isDone(): bool
     {
         return in_array($this->status, [self::STATUS_BUG_COMPLETED, self::STATUS_FEATURE_COMPLETED, self::STATUS_TASK_COMPLETED], true);
@@ -342,6 +356,7 @@ class Ticket extends Model
             self::STATUS_BUG_COMPLETED,
             self::STATUS_FEATURE_COMPLETED,
             self::STATUS_REJECTED,
+        self::STATUS_TRIAGE_PENDING,
             self::STATUS_BUG_BLOCKED,
             self::STATUS_FEATURE_BLOCKED,
             defined('self::STATUS_TASK_COMPLETED') ? self::STATUS_TASK_COMPLETED : null,
